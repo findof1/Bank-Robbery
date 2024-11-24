@@ -1,5 +1,6 @@
 #define SDL_MAIN_HANDLED
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_ttf.h>
 #include <iostream>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -47,6 +48,8 @@ struct Sprite
     std::optional<float> direction;
     std::optional<float> health;
     std::optional<std::chrono::_V2::system_clock::time_point> enemyLastBulletTime;
+    std::optional<std::chrono::_V2::system_clock::time_point> enemyLastMeleeTime;
+    std::optional<bool> move;
 };
 
 std::vector<Sprite> sprites;
@@ -110,7 +113,7 @@ std::vector<int> map;
 std::vector<int> mapFloors;
 std::vector<int> mapCeiling;
 
-int health = 30;
+int health = 100;
 int money = 0;
 
 int bombCount = 0;
@@ -130,19 +133,16 @@ void deserialize(const std::string &filename)
 
         size_t count;
         file.read(reinterpret_cast<char *>(&count), sizeof(count));
-        std::cout << "Deserializing map with count: " << count << "\n";
         map.resize(count);
         file.read(reinterpret_cast<char *>(map.data()), sizeof(int) * count);
 
         count;
         file.read(reinterpret_cast<char *>(&count), sizeof(count));
-        std::cout << "Deserializing mapFloors with count: " << count << "\n";
         mapFloors.resize(count);
         file.read(reinterpret_cast<char *>(mapFloors.data()), sizeof(int) * count);
 
         count;
         file.read(reinterpret_cast<char *>(&count), sizeof(count));
-        std::cout << "Deserializing mapCeiling with count: " << count << "\n";
         mapCeiling.resize(count);
         file.read(reinterpret_cast<char *>(mapCeiling.data()), sizeof(int) * count);
         file.close();
@@ -185,11 +185,18 @@ void deserializeSprites(const std::string &filename)
             }
             if (sprite.type == ShooterEnemy && hasHealth == false)
             {
-                sprite.health = 10;
+                sprite.health = 5;
             }
             if (sprite.type == ShooterEnemy)
             {
                 sprite.enemyLastBulletTime = std::chrono::high_resolution_clock::now();
+                sprite.enemyLastMeleeTime = std::chrono::high_resolution_clock::now();
+                sprite.move = false;
+            }
+            if (sprite.type == Enemy)
+            {
+                sprite.enemyLastMeleeTime = std::chrono::high_resolution_clock::now();
+                sprite.move = false;
             }
 
             if (hasHealth)
@@ -202,14 +209,6 @@ void deserializeSprites(const std::string &filename)
             {
                 file.read(reinterpret_cast<char *>(&sprite.direction), sizeof(float));
             }
-            std::cout << "Deserialized sprite: "
-                      << "Type: " << sprite.type
-                      << ", X: " << sprite.x
-                      << ", Y: " << sprite.y
-                      << ", Z: " << sprite.z
-                      << ", Health: " << (sprite.health.has_value() ? *sprite.health : 0.0f)
-                      << ", Direction: " << (sprite.direction.has_value() ? *sprite.direction : 0.0f)
-                      << std::endl;
             sprites.emplace_back(sprite);
         }
         file.close();
@@ -653,7 +652,7 @@ void drawSprites(SDL_Renderer *renderer, Player *player)
             }
         }
 
-        if (sprites[i].type == Enemy || sprites[i].type == ShooterEnemy)
+        if ((sprites[i].type == Enemy || sprites[i].type == ShooterEnemy) && sprites[i].move == true)
         {
             if (sprites[i].health <= 0)
             {
@@ -673,9 +672,10 @@ void drawSprites(SDL_Renderer *renderer, Player *player)
             float deltaY = player->pos.y - sprites[i].y;
 
             float distance = std::sqrt(deltaX * deltaX + deltaY * deltaY);
-            if (distance < 10)
+            if (distance < 10 && std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - sprites[i].enemyLastMeleeTime.value()).count() > 1000)
             {
-                gameRunning = false;
+                sprites[i].enemyLastMeleeTime = std::chrono::high_resolution_clock::now();
+                health -= 5;
             }
 
             if (distance > 0)
@@ -707,7 +707,7 @@ void drawSprites(SDL_Renderer *renderer, Player *player)
             }
         }
 
-        if (sprites[i].type == ShooterEnemy && std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - sprites[i].enemyLastBulletTime.value()).count() > shootingCooldown)
+        if (sprites[i].type == ShooterEnemy && std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - sprites[i].enemyLastBulletTime.value()).count() > shootingCooldown && sprites[i].move == true)
         {
             sprites[i].enemyLastBulletTime = std::chrono::high_resolution_clock::now();
 
@@ -784,6 +784,10 @@ void drawSprites(SDL_Renderer *renderer, Player *player)
 
                 if (static_cast<int>(glm::clamp((recX * 240) / 1024, 0.f, 240.f)) >= 0 && static_cast<int>(glm::clamp((recX * 240) / 1024, 0.f, 240.f)) < 241 && distance < distances[static_cast<int>(glm::clamp((recX * 240) / 1024, 0.f, 240.f))])
                 {
+                    if ((sprites[i].type == Enemy || sprites[i].type == ShooterEnemy) && sprites[i].move == false)
+                    {
+                        sprites[i].move = true;
+                    }
 
                     for (int y = 0; y < loadedTextures[textureIndex].height; y++)
                     {
@@ -845,8 +849,33 @@ void handleInput(Player *player)
     {
         player->angle += rotateSpeed * deltaTime;
     }
+    if (keystate[SDL_SCANCODE_Q])
+    {
+        int cellIndexX = floor(((player->pos.x + (moveSpeed * cos(degToRad(player->angle - 90)) * deltaTime)) * 1.0) / cellWidth);
+        int cellIndexY = floor(((player->pos.y + (moveSpeed * sin(degToRad(player->angle - 90)) * deltaTime)) * 1.0) / cellWidth);
 
+        int mapCellIndex = getCell(cellIndexX, cellIndexY);
+
+        if (map[mapCellIndex] == 0)
+        {
+            player->pos.x += moveSpeed * cos(degToRad(player->angle - 90)) * deltaTime;
+            player->pos.y += moveSpeed * sin(degToRad(player->angle - 90)) * deltaTime;
+        }
+    }
     if (keystate[SDL_SCANCODE_E])
+    {
+        int cellIndexX = floor(((player->pos.x - (moveSpeed * cos(degToRad(player->angle - 90)) * 1.1 * deltaTime))) / cellWidth);
+        int cellIndexY = floor(((player->pos.y - (moveSpeed * sin(degToRad(player->angle - 90)) * 1.1 * deltaTime))) / cellWidth);
+        int mapCellIndex = getCell(cellIndexX, cellIndexY);
+
+        if (map[mapCellIndex] == 0)
+        {
+            player->pos.x -= moveSpeed * cos(degToRad(player->angle - 90)) * deltaTime;
+            player->pos.y -= moveSpeed * sin(degToRad(player->angle - 90)) * deltaTime;
+        }
+    }
+
+    if (keystate[SDL_SCANCODE_R])
     {
 
         int cellIndexX = floor(((player->pos.x + (moveSpeed * cos(degToRad(player->angle)) * 4 * deltaTime))) / cellWidth);
@@ -875,11 +904,10 @@ int main()
 {
 
     loadTextures();
-    std::cout << loadedTextures.size();
     deserialize("map.dat");
     deserializeSprites("sprites.dat");
 
-    if (SDL_Init(SDL_INIT_VIDEO) < 0)
+    if (SDL_Init(SDL_INIT_VIDEO) < 0 || TTF_Init() != 0)
     {
         std::cerr << "SDL could not initialize! SDL_Error: " << SDL_GetError() << std::endl;
         return 1;
@@ -902,9 +930,18 @@ int main()
         return 1;
     }
 
+    TTF_Font *font = TTF_OpenFont("C:\\Windows\\Fonts\\Arial.ttf", 24);
+    if (!font)
+    {
+        printf("Error loading font: %s\n", TTF_GetError());
+        return 1;
+    }
+
+    SDL_Color healthTextColor = {255, 25, 25, 155};
+
     Player player = {{80.0f, 80.0f}, 0.0f, 60};
 
-      auto startTime = std::chrono::high_resolution_clock::now();
+    auto startTime = std::chrono::high_resolution_clock::now();
     lastTime = std::chrono::high_resolution_clock::now();
     while (gameRunning)
     {
@@ -976,6 +1013,23 @@ int main()
         // SDL_RenderDrawPoint(renderer, static_cast<int>(player.pos.x), static_cast<int>(player.pos.y));
 
         drawSprites(renderer, &player);
+
+        std::string text = "Health: " + std::to_string(health);
+        SDL_Surface *textSurface = TTF_RenderText_Solid(font, text.c_str(), healthTextColor);
+        if (!textSurface)
+        {
+            printf("Error rendering text: %s\n", TTF_GetError());
+            return 1;
+        }
+
+        SDL_Texture *healthText = SDL_CreateTextureFromSurface(renderer, textSurface);
+
+        SDL_Rect textRect = {20, 20, textSurface->w, textSurface->h};
+        SDL_RenderCopy(renderer, healthText, NULL, &textRect);
+
+        SDL_FreeSurface(textSurface);
+        SDL_DestroyTexture(healthText);
+
         SDL_RenderPresent(renderer);
 
         SDL_Delay(16);
