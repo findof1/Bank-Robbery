@@ -110,7 +110,7 @@ std::vector<int> map;
 std::vector<int> mapFloors;
 std::vector<int> mapCeiling;
 
-int health = 10;
+int health = 30;
 int money = 0;
 
 int bombCount = 0;
@@ -145,6 +145,73 @@ void deserialize(const std::string &filename)
         std::cout << "Deserializing mapCeiling with count: " << count << "\n";
         mapCeiling.resize(count);
         file.read(reinterpret_cast<char *>(mapCeiling.data()), sizeof(int) * count);
+        file.close();
+    }
+    else
+    {
+        std::cerr << "Error opening file for reading.\n";
+    }
+}
+
+void deserializeSprites(const std::string &filename)
+{
+    std::ifstream file(filename, std::ios::binary | std::ios::in);
+    if (file)
+    {
+        int spritesSize;
+        file.read(reinterpret_cast<char *>(&spritesSize), sizeof(int));
+        for (int i = 0; i < spritesSize; i++)
+        {
+            Sprite sprite;
+            int type;
+            file.read(reinterpret_cast<char *>(&type), sizeof(int));
+            sprite.type = static_cast<SpriteType>(type - 1);
+            file.read(reinterpret_cast<char *>(&sprite.x), sizeof(float));
+            file.read(reinterpret_cast<char *>(&sprite.y), sizeof(float));
+            file.read(reinterpret_cast<char *>(&sprite.z), sizeof(float));
+            if (sprite.type == Enemy || sprite.type == ShooterEnemy)
+            {
+                sprite.z = 20;
+            }
+            file.read(reinterpret_cast<char *>(&sprite.scaleX), sizeof(float));
+            file.read(reinterpret_cast<char *>(&sprite.scaleY), sizeof(float));
+            file.read(reinterpret_cast<char *>(&sprite.active), sizeof(bool));
+
+            bool hasHealth;
+            file.read(reinterpret_cast<char *>(&hasHealth), sizeof(bool));
+            if (sprite.type == Enemy && hasHealth == false)
+            {
+                sprite.health = 20;
+            }
+            if (sprite.type == ShooterEnemy && hasHealth == false)
+            {
+                sprite.health = 10;
+            }
+            if (sprite.type == ShooterEnemy)
+            {
+                sprite.enemyLastBulletTime = std::chrono::high_resolution_clock::now();
+            }
+
+            if (hasHealth)
+            {
+                file.read(reinterpret_cast<char *>(&sprite.health), sizeof(float));
+            }
+            bool hasDirection;
+            file.read(reinterpret_cast<char *>(&hasDirection), sizeof(bool));
+            if (hasDirection)
+            {
+                file.read(reinterpret_cast<char *>(&sprite.direction), sizeof(float));
+            }
+            std::cout << "Deserialized sprite: "
+                      << "Type: " << sprite.type
+                      << ", X: " << sprite.x
+                      << ", Y: " << sprite.y
+                      << ", Z: " << sprite.z
+                      << ", Health: " << (sprite.health.has_value() ? *sprite.health : 0.0f)
+                      << ", Direction: " << (sprite.direction.has_value() ? *sprite.direction : 0.0f)
+                      << std::endl;
+            sprites.emplace_back(sprite);
+        }
         file.close();
     }
     else
@@ -810,6 +877,7 @@ int main()
     loadTextures();
     std::cout << loadedTextures.size();
     deserialize("map.dat");
+    deserializeSprites("sprites.dat");
 
     if (SDL_Init(SDL_INIT_VIDEO) < 0)
     {
@@ -836,66 +904,7 @@ int main()
 
     Player player = {{80.0f, 80.0f}, 0.0f, 60};
 
-    Sprite key;
-    key.active = true;
-    key.type = Key;
-    key.x = 480;
-    key.y = 288;
-    key.z = 0;
-    sprites.emplace_back(key);
-
-    Sprite enemy;
-    enemy.active = true;
-    enemy.type = Enemy;
-    enemy.x = 400;
-    enemy.y = 80;
-    enemy.z = 20;
-    enemy.health = 20;
-    sprites.emplace_back(enemy);
-
-    enemy.x = 500;
-    sprites.emplace_back(enemy);
-
-    enemy.x = 600;
-    enemy.scaleX = 1.2;
-    enemy.scaleY = 1.2;
-    sprites.emplace_back(enemy);
-
-    Sprite enemyGunman;
-    enemyGunman.active = true;
-    enemyGunman.type = ShooterEnemy;
-    enemyGunman.x = 900;
-    enemyGunman.y = 260;
-    enemyGunman.z = 20;
-    enemyGunman.enemyLastBulletTime = std::chrono::high_resolution_clock::now();
-    enemyGunman.health = 10;
-    sprites.emplace_back(enemyGunman);
-
-    Sprite bomb;
-    bomb.active = true;
-    bomb.type = Bomb;
-    bomb.x = 468;
-    bomb.y = 80;
-    bomb.z = 10;
-    sprites.emplace_back(bomb);
-
-    Sprite coin;
-    coin.active = true;
-    coin.type = Coin;
-    coin.x = 224;
-    coin.y = 416;
-    coin.z = 20;
-    sprites.emplace_back(coin);
-
-    coin.x = 204;
-    coin.y = 406;
-    sprites.emplace_back(coin);
-
-    coin.x = 190;
-    coin.y = 426;
-    sprites.emplace_back(coin);
-
-    auto startTime = std::chrono::high_resolution_clock::now();
+      auto startTime = std::chrono::high_resolution_clock::now();
     lastTime = std::chrono::high_resolution_clock::now();
     while (gameRunning)
     {
