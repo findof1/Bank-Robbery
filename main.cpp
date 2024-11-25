@@ -15,8 +15,76 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+class Button
+{
+private:
+    SDL_Rect rect;
+    SDL_Color color;
+    SDL_Color hoverColor;
+    SDL_Color currentColor;
+    SDL_Renderer *renderer;
+    SDL_Texture *textTexture;
+    SDL_Rect textRect;
+
+public:
+    Button(SDL_Renderer *renderer, int x, int y, int w, int h, SDL_Color color, SDL_Color hoverColor, const std::string &text, TTF_Font *font)
+        : renderer(renderer), color(color), hoverColor(hoverColor), currentColor(color)
+    {
+        rect = {x, y, w, h};
+
+        SDL_Surface *textSurface = TTF_RenderText_Solid(font, text.c_str(), {255, 255, 255, 255});
+        textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
+
+        textRect = {x + (w - textSurface->w) / 2, y + (h - textSurface->h) / 2, textSurface->w, textSurface->h};
+        SDL_FreeSurface(textSurface);
+    }
+
+    ~Button()
+    {
+        SDL_DestroyTexture(textTexture);
+    }
+
+    void render()
+    {
+
+        SDL_SetRenderDrawColor(renderer, currentColor.r, currentColor.g, currentColor.b, currentColor.a);
+        SDL_RenderFillRect(renderer, &rect);
+
+        SDL_RenderCopy(renderer, textTexture, NULL, &textRect);
+    }
+
+    bool handleEvent(const SDL_Event &event)
+    {
+        if (event.type == SDL_MOUSEMOTION || event.type == SDL_MOUSEBUTTONDOWN)
+        {
+            int mouseX, mouseY;
+            SDL_GetMouseState(&mouseX, &mouseY);
+            SDL_Point mousePos = {mouseX, mouseY};
+            bool isHovered = SDL_PointInRect(&mousePos, &rect);
+
+            if (isHovered)
+            {
+                currentColor = hoverColor;
+
+                if (event.type == SDL_MOUSEBUTTONDOWN)
+                {
+                    return true;
+                }
+            }
+            else
+            {
+                currentColor = color;
+            }
+        }
+
+        return false;
+    }
+};
+
 const float moveSpeed = 100.f;
-const float rotateSpeed = 100.f;
+float rotateSpeed;
+float rotateSpeedFast = 180;
+float rotateSpeedSlow = 60;
 
 bool gameRunning = true;
 
@@ -72,6 +140,10 @@ std::vector<std::string> textureFilepaths = {
     "./textures/brickWall.png",
     "./textures/crackedBrickWall.png",
     "./textures/tiledFloor.png",
+    "./textures/blueBrickWall.png",
+    "./textures/crackedBlueBrickWall.png",
+    "./textures/carpet.png",
+    "./textures/tiledCeiling.png",
     "./textures/enemy.png",
     "./textures/bomb.png",
     "./textures/bullet.png",
@@ -102,7 +174,7 @@ void loadTextures()
     }
 }
 
-float distances[241];
+std::vector<float> distances;
 
 int mapX;
 int mapY;
@@ -116,6 +188,7 @@ std::vector<int> mapCeiling;
 int health = 100;
 int money = 0;
 
+int level = 0;
 int bombCount = 0;
 int keyCount = 0;
 const int shootingCooldown = 500;
@@ -476,7 +549,7 @@ SDL_RenderDrawLine(renderer, player->pos.x, player->pos.y, rayX, rayY);
 
         float distance = std::min(distanceHorizontal, distanceVertical);
         float correctedDistance = distance * cos(degToRad(FixAngle(player->angle - rayAngle)));
-        distances[static_cast<int>(i / rayStep)] = distance;
+        distances.emplace_back(distance);
         SDL_FRect rectangle;
         rectangle.x = i * (1024 / (player->FOV));
         rectangle.h = (64 * 512) / correctedDistance;
@@ -753,27 +826,27 @@ void drawSprites(SDL_Renderer *renderer, Player *player)
 
             if (sprites[i].type == Key)
             {
-                textureIndex = 13;
+                textureIndex = 17;
             }
 
             if (sprites[i].type == Coin)
             {
-                textureIndex = 14;
+                textureIndex = 18;
             }
 
             if (sprites[i].type == Bomb)
             {
-                textureIndex = 11;
+                textureIndex = 15;
             }
 
             if (sprites[i].type == Bullet || sprites[i].type == EnemyBullet)
             {
-                textureIndex = 12;
+                textureIndex = 16;
             }
 
             if (sprites[i].type == Enemy || sprites[i].type == ShooterEnemy)
             {
-                textureIndex = 10;
+                textureIndex = 14;
             }
 
             for (int x = 0; x < loadedTextures[textureIndex].width; x++)
@@ -782,7 +855,7 @@ void drawSprites(SDL_Renderer *renderer, Player *player)
 
                 recX -= ((preCalculatedWidth * loadedTextures[textureIndex].width) / 8);
 
-                if (static_cast<int>(glm::clamp((recX * 240) / 1024, 0.f, 240.f)) >= 0 && static_cast<int>(glm::clamp((recX * 240) / 1024, 0.f, 240.f)) < 241 && distance < distances[static_cast<int>(glm::clamp((recX * 240) / 1024, 0.f, 240.f))])
+                if (static_cast<int>(glm::clamp((recX * (player->FOV / rayStep)) / 1024, 0.f, (player->FOV / rayStep))) - 1 >= 0 && static_cast<int>(glm::clamp((recX * (player->FOV / rayStep)) / 1024, 0.f, (player->FOV / rayStep))) - 1 <= (player->FOV / rayStep) && distance < distances.at(static_cast<int>(glm::clamp((recX * (player->FOV / rayStep)) / 1024, 0.f, (player->FOV / rayStep))) - 1))
                 {
                     if ((sprites[i].type == Enemy || sprites[i].type == ShooterEnemy) && sprites[i].move == false)
                     {
@@ -815,6 +888,14 @@ void handleInput(Player *player)
 {
     const Uint8 *keystate = SDL_GetKeyboardState(NULL);
 
+    if (keystate[SDL_SCANCODE_LSHIFT])
+    {
+        rotateSpeed = rotateSpeedSlow;
+    }
+    else
+    {
+        rotateSpeed = rotateSpeedFast;
+    }
     if (keystate[SDL_SCANCODE_W])
     {
         int cellIndexX = floor(((player->pos.x + (moveSpeed * cos(degToRad(player->angle)) * deltaTime)) * 1.0) / cellWidth);
@@ -851,27 +932,27 @@ void handleInput(Player *player)
     }
     if (keystate[SDL_SCANCODE_Q])
     {
-        int cellIndexX = floor(((player->pos.x + (moveSpeed * cos(degToRad(player->angle - 90)) * deltaTime)) * 1.0) / cellWidth);
-        int cellIndexY = floor(((player->pos.y + (moveSpeed * sin(degToRad(player->angle - 90)) * deltaTime)) * 1.0) / cellWidth);
+        int cellIndexX = floor(((player->pos.x + ((moveSpeed / 1.5) * cos(degToRad(player->angle - 90)) * deltaTime)) * 1.0) / cellWidth);
+        int cellIndexY = floor(((player->pos.y + ((moveSpeed / 1.5) * sin(degToRad(player->angle - 90)) * deltaTime)) * 1.0) / cellWidth);
 
         int mapCellIndex = getCell(cellIndexX, cellIndexY);
 
         if (map[mapCellIndex] == 0)
         {
-            player->pos.x += moveSpeed * cos(degToRad(player->angle - 90)) * deltaTime;
-            player->pos.y += moveSpeed * sin(degToRad(player->angle - 90)) * deltaTime;
+            player->pos.x += (moveSpeed / 1.5) * cos(degToRad(player->angle - 90)) * deltaTime;
+            player->pos.y += (moveSpeed / 1.5) * sin(degToRad(player->angle - 90)) * deltaTime;
         }
     }
     if (keystate[SDL_SCANCODE_E])
     {
-        int cellIndexX = floor(((player->pos.x - (moveSpeed * cos(degToRad(player->angle - 90)) * 1.1 * deltaTime))) / cellWidth);
-        int cellIndexY = floor(((player->pos.y - (moveSpeed * sin(degToRad(player->angle - 90)) * 1.1 * deltaTime))) / cellWidth);
+        int cellIndexX = floor(((player->pos.x - ((moveSpeed / 1.5) * cos(degToRad(player->angle - 90)) * 1.1 * deltaTime))) / cellWidth);
+        int cellIndexY = floor(((player->pos.y - ((moveSpeed / 1.5) * sin(degToRad(player->angle - 90)) * 1.1 * deltaTime))) / cellWidth);
         int mapCellIndex = getCell(cellIndexX, cellIndexY);
 
         if (map[mapCellIndex] == 0)
         {
-            player->pos.x -= moveSpeed * cos(degToRad(player->angle - 90)) * deltaTime;
-            player->pos.y -= moveSpeed * sin(degToRad(player->angle - 90)) * deltaTime;
+            player->pos.x -= (moveSpeed / 1.5) * cos(degToRad(player->angle - 90)) * deltaTime;
+            player->pos.y -= (moveSpeed / 1.5) * sin(degToRad(player->angle - 90)) * deltaTime;
         }
     }
 
@@ -904,8 +985,6 @@ int main()
 {
 
     loadTextures();
-    deserialize("map.dat");
-    deserializeSprites("sprites.dat");
 
     if (SDL_Init(SDL_INIT_VIDEO) < 0 || TTF_Init() != 0)
     {
@@ -930,14 +1009,15 @@ int main()
         return 1;
     }
 
-    TTF_Font *font = TTF_OpenFont("C:\\Windows\\Fonts\\Arial.ttf", 24);
+    TTF_Font *font = TTF_OpenFont("C:\\Windows\\Fonts\\courbd.ttf", 24);
     if (!font)
     {
         printf("Error loading font: %s\n", TTF_GetError());
         return 1;
     }
 
-    SDL_Color healthTextColor = {255, 25, 25, 155};
+    SDL_Color healthTextColor = {155, 25, 25, 255};
+    SDL_Color coinTextColor = {255, 255, 25, 255};
 
     Player player = {{80.0f, 80.0f}, 0.0f, 60};
 
@@ -945,12 +1025,44 @@ int main()
     lastTime = std::chrono::high_resolution_clock::now();
     while (gameRunning)
     {
+        distances.clear();
         currentTime = std::chrono::high_resolution_clock::now();
         std::chrono::duration<float> elapsed = currentTime - startTime;
         deltaTime = ((std::chrono::duration<float>)(currentTime - lastTime)).count();
 
         lastTime = currentTime;
 
+        if (level == 0)
+        {
+            Button level1(renderer, 40, 40, 200, 200, {200, 200, 200, 255}, {210, 210, 210, 255}, "Level 1", font);
+            Button level2(renderer, 280, 40, 200, 200, {200, 200, 200, 255}, {210, 210, 210, 255}, "Level 2", font);
+            SDL_Event event;
+            while (SDL_PollEvent(&event))
+            {
+                if (level1.handleEvent(event))
+                {
+                    deserialize("map.dat");
+                    deserializeSprites("sprites.dat");
+                    level = 1;
+                }
+                if (level2.handleEvent(event))
+                {
+                    deserialize("map2.dat");
+                    deserializeSprites("sprites2.dat");
+                    level = 2;
+                }
+            }
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+            SDL_RenderClear(renderer);
+
+            level1.render();
+            level2.render();
+
+            SDL_RenderPresent(renderer);
+
+            SDL_Delay(16);
+            continue;
+        }
         if (health <= 0)
         {
             gameRunning = false;
@@ -964,6 +1076,7 @@ int main()
             {
                 gameRunning = false;
             }
+
             else if (event.type == SDL_MOUSEBUTTONDOWN)
             {
 
@@ -1027,8 +1140,22 @@ int main()
         SDL_Rect textRect = {20, 20, textSurface->w, textSurface->h};
         SDL_RenderCopy(renderer, healthText, NULL, &textRect);
 
+        text = "Money: " + std::to_string(money);
+        textSurface = TTF_RenderText_Solid(font, text.c_str(), coinTextColor);
+        if (!textSurface)
+        {
+            printf("Error rendering text: %s\n", TTF_GetError());
+            return 1;
+        }
+
+        SDL_Texture *coinText = SDL_CreateTextureFromSurface(renderer, textSurface);
+
+        textRect = {1024 - textSurface->w - 20, 20, textSurface->w, textSurface->h};
+        SDL_RenderCopy(renderer, coinText, NULL, &textRect);
+
         SDL_FreeSurface(textSurface);
         SDL_DestroyTexture(healthText);
+        SDL_DestroyTexture(coinText);
 
         SDL_RenderPresent(renderer);
 
