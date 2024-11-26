@@ -144,6 +144,8 @@ std::vector<std::string> textureFilepaths = {
     "./textures/crackedBlueBrickWall.png",
     "./textures/carpet.png",
     "./textures/tiledCeiling.png",
+    "./textures/metalPlate.png",
+    "./textures/marble.png",
     "./textures/enemy.png",
     "./textures/bomb.png",
     "./textures/bullet.png",
@@ -826,27 +828,27 @@ void drawSprites(SDL_Renderer *renderer, Player *player)
 
             if (sprites[i].type == Key)
             {
-                textureIndex = 17;
+                textureIndex = 19;
             }
 
             if (sprites[i].type == Coin)
             {
-                textureIndex = 18;
+                textureIndex = 20;
             }
 
             if (sprites[i].type == Bomb)
             {
-                textureIndex = 15;
+                textureIndex = 17;
             }
 
             if (sprites[i].type == Bullet || sprites[i].type == EnemyBullet)
             {
-                textureIndex = 16;
+                textureIndex = 18;
             }
 
             if (sprites[i].type == Enemy || sprites[i].type == ShooterEnemy)
             {
-                textureIndex = 14;
+                textureIndex = 16;
             }
 
             for (int x = 0; x < loadedTextures[textureIndex].width; x++)
@@ -968,7 +970,7 @@ void handleInput(Player *player)
         {
             map[mapCellIndex] = 0;
         }
-        if (map[mapCellIndex] == 9 && bombCount > 0)
+        if ((map[mapCellIndex] == 9 || map[mapCellIndex] == 12) && bombCount > 0)
         {
             map[mapCellIndex] = 0;
             bombCount -= 1;
@@ -1036,6 +1038,7 @@ int main()
         {
             Button level1(renderer, 40, 40, 200, 200, {200, 200, 200, 255}, {210, 210, 210, 255}, "Level 1", font);
             Button level2(renderer, 280, 40, 200, 200, {200, 200, 200, 255}, {210, 210, 210, 255}, "Level 2", font);
+            Button level3(renderer, 520, 40, 200, 200, {200, 200, 200, 255}, {210, 210, 210, 255}, "Level 3", font);
             SDL_Event event;
             while (SDL_PollEvent(&event))
             {
@@ -1051,12 +1054,19 @@ int main()
                     deserializeSprites("sprites2.dat");
                     level = 2;
                 }
+                if (level3.handleEvent(event))
+                {
+                    deserialize("map3.dat");
+                    deserializeSprites("sprites3.dat");
+                    level = 3;
+                }
             }
             SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
             SDL_RenderClear(renderer);
 
             level1.render();
             level2.render();
+            level3.render();
 
             SDL_RenderPresent(renderer);
 
