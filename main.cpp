@@ -1,6 +1,7 @@
 #define SDL_MAIN_HANDLED
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
+#include <SDL2/SDL_image.h>
 #include <iostream>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -18,8 +19,10 @@
 class Button
 {
 private:
-    SDL_Rect rect;
+    SDL_FRect rect;
     SDL_Color color;
+    SDL_Color borderColor;
+    float borderThickness;
     SDL_Color hoverColor;
     SDL_Color currentColor;
     SDL_Renderer *renderer;
@@ -27,15 +30,21 @@ private:
     SDL_Rect textRect;
 
 public:
-    Button(SDL_Renderer *renderer, int x, int y, int w, int h, SDL_Color color, SDL_Color hoverColor, const std::string &text, TTF_Font *font)
-        : renderer(renderer), color(color), hoverColor(hoverColor), currentColor(color)
+    Button(SDL_Renderer *renderer, float x, float y, float w, float h, SDL_Color color, SDL_Color hoverColor, const std::string &text, TTF_Font *font, float borderThickness, SDL_Color borderColor)
+        : renderer(renderer), color(color), hoverColor(hoverColor), currentColor(color), borderThickness(borderThickness), borderColor(borderColor)
     {
-        rect = {x, y, w, h};
+        rect.x = x;
+        rect.y = y;
+        rect.w = w;
+        rect.h = h;
 
-        SDL_Surface *textSurface = TTF_RenderText_Solid(font, text.c_str(), {255, 255, 255, 255});
+        SDL_Surface *textSurface = TTF_RenderText_Solid(font, text.c_str(), {25, 25, 25, 255});
         textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
 
-        textRect = {x + (w - textSurface->w) / 2, y + (h - textSurface->h) / 2, textSurface->w, textSurface->h};
+        textRect = {static_cast<int>(x + (w - textSurface->w) / 2),
+                    static_cast<int>(y + (h - textSurface->h) / 2),
+                    textSurface->w,
+                    textSurface->h};
         SDL_FreeSurface(textSurface);
     }
 
@@ -47,8 +56,29 @@ public:
     void render()
     {
 
+        SDL_FRect borderRect = {rect.x - borderThickness, rect.y - borderThickness,
+                                rect.w + 2 * borderThickness, rect.h + 2 * borderThickness};
+        SDL_SetRenderDrawColor(renderer, borderColor.r, borderColor.g, borderColor.b, borderColor.a);
+        SDL_RenderFillRectF(renderer, &borderRect);
+
+        SDL_FRect highlightRect;
+        highlightRect.x = rect.x - 5;
+        highlightRect.y = rect.y - 5;
+        highlightRect.w = rect.w + 10;
+        highlightRect.h = rect.h + 10;
+        SDL_SetRenderDrawColor(renderer, 235, 235, 235, 100);
+        SDL_RenderFillRectF(renderer, &highlightRect);
+
+        SDL_FRect shadowRect;
+        shadowRect.x = rect.x + 5;
+        shadowRect.y = rect.y + 5;
+        shadowRect.w = rect.w;
+        shadowRect.h = rect.h;
+        SDL_SetRenderDrawColor(renderer, 50, 50, 50, 100);
+        SDL_RenderFillRectF(renderer, &shadowRect);
+
         SDL_SetRenderDrawColor(renderer, currentColor.r, currentColor.g, currentColor.b, currentColor.a);
-        SDL_RenderFillRect(renderer, &rect);
+        SDL_RenderFillRectF(renderer, &rect);
 
         SDL_RenderCopy(renderer, textTexture, NULL, &textRect);
     }
@@ -59,8 +89,8 @@ public:
         {
             int mouseX, mouseY;
             SDL_GetMouseState(&mouseX, &mouseY);
-            SDL_Point mousePos = {mouseX, mouseY};
-            bool isHovered = SDL_PointInRect(&mousePos, &rect);
+            SDL_FPoint mousePos = {static_cast<float>(mouseX), static_cast<float>(mouseY)};
+            bool isHovered = SDL_PointInFRect(&mousePos, &rect);
 
             if (isHovered)
             {
@@ -84,7 +114,7 @@ public:
 const float moveSpeed = 100.f;
 float rotateSpeed;
 float rotateSpeedFast = 180;
-float rotateSpeedSlow = 60;
+float rotateSpeedSlow = 30;
 
 bool gameRunning = true;
 
@@ -146,6 +176,7 @@ std::vector<std::string> textureFilepaths = {
     "./textures/tiledCeiling.png",
     "./textures/metalPlate.png",
     "./textures/marble.png",
+    "./textures/exit.png",
     "./textures/enemy.png",
     "./textures/bomb.png",
     "./textures/bullet.png",
@@ -188,14 +219,23 @@ std::vector<int> mapFloors;
 std::vector<int> mapCeiling;
 
 int health = 100;
+int levelMoney = 0;
 int money = 0;
 
 int level = 0;
 int bombCount = 0;
 int keyCount = 0;
-const int shootingCooldown = 500;
+const int pistolShootingCooldown = 500;
+const int shotgunShootingCooldown = 1000;
 auto lastBulletTime = std::chrono::high_resolution_clock::now();
 int gunDamage = 5;
+
+enum GunType
+{
+    Pistol,
+    Shotgun
+};
+int gunType = Pistol;
 
 void deserialize(const std::string &filename)
 {
@@ -237,10 +277,16 @@ void deserializeSprites(const std::string &filename)
         file.read(reinterpret_cast<char *>(&spritesSize), sizeof(int));
         for (int i = 0; i < spritesSize; i++)
         {
+            bool invalid = false;
             Sprite sprite;
             int type;
             file.read(reinterpret_cast<char *>(&type), sizeof(int));
+            if (type - 1 < 0 || type - 1 > static_cast<int>(SpriteType::Coin))
+            {
+                invalid = true;
+            }
             sprite.type = static_cast<SpriteType>(type - 1);
+
             file.read(reinterpret_cast<char *>(&sprite.x), sizeof(float));
             file.read(reinterpret_cast<char *>(&sprite.y), sizeof(float));
             file.read(reinterpret_cast<char *>(&sprite.z), sizeof(float));
@@ -284,7 +330,9 @@ void deserializeSprites(const std::string &filename)
             {
                 file.read(reinterpret_cast<char *>(&sprite.direction), sizeof(float));
             }
-            sprites.emplace_back(sprite);
+
+            if (!invalid)
+                sprites.emplace_back(sprite);
         }
         file.close();
     }
@@ -647,7 +695,7 @@ void drawSprites(SDL_Renderer *renderer, Player *player)
             if (distance < 15)
             {
                 sprites[i].active = false;
-                money += 5;
+                levelMoney += 5;
             }
         }
 
@@ -733,11 +781,11 @@ void drawSprites(SDL_Renderer *renderer, Player *player)
             {
                 if (sprites[i].type == Enemy)
                 {
-                    money += 1;
+                    levelMoney += 1;
                 }
                 else if (sprites[i].type == ShooterEnemy)
                 {
-                    money += 2;
+                    levelMoney += 2;
                 }
                 sprites[i].active = false;
                 continue;
@@ -782,7 +830,7 @@ void drawSprites(SDL_Renderer *renderer, Player *player)
             }
         }
 
-        if (sprites[i].type == ShooterEnemy && std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - sprites[i].enemyLastBulletTime.value()).count() > shootingCooldown && sprites[i].move == true)
+        if (sprites[i].type == ShooterEnemy && std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - sprites[i].enemyLastBulletTime.value()).count() > pistolShootingCooldown && sprites[i].move == true)
         {
             sprites[i].enemyLastBulletTime = std::chrono::high_resolution_clock::now();
 
@@ -828,27 +876,27 @@ void drawSprites(SDL_Renderer *renderer, Player *player)
 
             if (sprites[i].type == Key)
             {
-                textureIndex = 19;
+                textureIndex = 20;
             }
 
             if (sprites[i].type == Coin)
             {
-                textureIndex = 20;
+                textureIndex = 21;
             }
 
             if (sprites[i].type == Bomb)
             {
-                textureIndex = 17;
+                textureIndex = 18;
             }
 
             if (sprites[i].type == Bullet || sprites[i].type == EnemyBullet)
             {
-                textureIndex = 18;
+                textureIndex = 19;
             }
 
             if (sprites[i].type == Enemy || sprites[i].type == ShooterEnemy)
             {
-                textureIndex = 16;
+                textureIndex = 17;
             }
 
             for (int x = 0; x < loadedTextures[textureIndex].width; x++)
@@ -932,10 +980,10 @@ void handleInput(Player *player)
     {
         player->angle += rotateSpeed * deltaTime;
     }
-    if (keystate[SDL_SCANCODE_Q])
+    if (keystate[SDL_SCANCODE_LEFT] || keystate[SDL_SCANCODE_Q])
     {
-        int cellIndexX = floor(((player->pos.x + ((moveSpeed / 1.5) * cos(degToRad(player->angle - 90)) * deltaTime)) * 1.0) / cellWidth);
-        int cellIndexY = floor(((player->pos.y + ((moveSpeed / 1.5) * sin(degToRad(player->angle - 90)) * deltaTime)) * 1.0) / cellWidth);
+        int cellIndexX = floor(((player->pos.x + ((moveSpeed / 1.4) * cos(degToRad(player->angle - 90)) * deltaTime)) * 1.0) / cellWidth);
+        int cellIndexY = floor(((player->pos.y + ((moveSpeed / 1.4) * sin(degToRad(player->angle - 90)) * deltaTime)) * 1.0) / cellWidth);
 
         int mapCellIndex = getCell(cellIndexX, cellIndexY);
 
@@ -945,10 +993,10 @@ void handleInput(Player *player)
             player->pos.y += (moveSpeed / 1.5) * sin(degToRad(player->angle - 90)) * deltaTime;
         }
     }
-    if (keystate[SDL_SCANCODE_E])
+    if (keystate[SDL_SCANCODE_RIGHT] || keystate[SDL_SCANCODE_E])
     {
-        int cellIndexX = floor(((player->pos.x - ((moveSpeed / 1.5) * cos(degToRad(player->angle - 90)) * 1.1 * deltaTime))) / cellWidth);
-        int cellIndexY = floor(((player->pos.y - ((moveSpeed / 1.5) * sin(degToRad(player->angle - 90)) * 1.1 * deltaTime))) / cellWidth);
+        int cellIndexX = floor(((player->pos.x - ((moveSpeed / 1.4) * cos(degToRad(player->angle - 90)) * 1.1 * deltaTime))) / cellWidth);
+        int cellIndexY = floor(((player->pos.y - ((moveSpeed / 1.4) * sin(degToRad(player->angle - 90)) * 1.1 * deltaTime))) / cellWidth);
         int mapCellIndex = getCell(cellIndexX, cellIndexY);
 
         if (map[mapCellIndex] == 0)
@@ -958,7 +1006,7 @@ void handleInput(Player *player)
         }
     }
 
-    if (keystate[SDL_SCANCODE_R])
+    if (keystate[SDL_SCANCODE_F])
     {
 
         int cellIndexX = floor(((player->pos.x + (moveSpeed * cos(degToRad(player->angle)) * 4 * deltaTime))) / cellWidth);
@@ -980,6 +1028,11 @@ void handleInput(Player *player)
             map[mapCellIndex] = 0;
             keyCount -= 1;
         }
+        if (map[mapCellIndex] == 17)
+        {
+            level = 0;
+            money += levelMoney;
+        }
     }
 }
 
@@ -993,13 +1046,30 @@ int main()
         std::cerr << "SDL could not initialize! SDL_Error: " << SDL_GetError() << std::endl;
         return 1;
     }
+    if (!(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG))
+    {
+        SDL_Log("Unable to initialize SDL_image: %s", IMG_GetError());
+        SDL_Quit();
+        return 1;
+    }
 
-    SDL_Window *window = SDL_CreateWindow("Psudo 3d Raytracer", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1024, 512, SDL_WINDOW_SHOWN);
+    SDL_Window *window = SDL_CreateWindow("It's a Bank Robbery", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1024, 512, SDL_WINDOW_SHOWN);
     if (!window)
     {
         std::cerr << "Window could not be created! SDL_Error: " << SDL_GetError() << std::endl;
         SDL_Quit();
         return 1;
+    }
+
+    SDL_Surface *icon = IMG_Load("./textures/icon.png");
+    if (icon)
+    {
+        SDL_SetWindowIcon(window, icon);
+        SDL_FreeSurface(icon);
+    }
+    else
+    {
+        SDL_Log("Unable to load icon: %s", SDL_GetError());
     }
 
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
@@ -1021,6 +1091,31 @@ int main()
     SDL_Color healthTextColor = {155, 25, 25, 255};
     SDL_Color coinTextColor = {255, 255, 25, 255};
 
+    SDL_Texture *background = IMG_LoadTexture(renderer, "./textures/background.png");
+    if (!background)
+    {
+        SDL_Log("Unable to load background image: %s", IMG_GetError());
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(window);
+        IMG_Quit();
+        SDL_Quit();
+        return 1;
+    }
+    SDL_SetTextureBlendMode(background, SDL_BLENDMODE_BLEND);
+    SDL_SetTextureAlphaMod(background, 100);
+
+    std::string title = "It's a Bank Robbery";
+    SDL_Surface *titleTextSurface = TTF_RenderText_Solid(font, title.c_str(), {255, 255, 255, 255});
+    if (!titleTextSurface)
+    {
+        printf("Error rendering text: %s\n", TTF_GetError());
+        return 1;
+    }
+
+    SDL_Texture *titleText = SDL_CreateTextureFromSurface(renderer, titleTextSurface);
+    SDL_Rect titleRect = {512 - ((titleTextSurface->w * 3) / 2), 60, titleTextSurface->w * 3, titleTextSurface->h * 3};
+    SDL_FreeSurface(titleTextSurface);
+
     Player player = {{80.0f, 80.0f}, 0.0f, 60};
 
     auto startTime = std::chrono::high_resolution_clock::now();
@@ -1036,37 +1131,132 @@ int main()
 
         if (level == 0)
         {
-            Button level1(renderer, 40, 40, 200, 200, {200, 200, 200, 255}, {210, 210, 210, 255}, "Level 1", font);
-            Button level2(renderer, 280, 40, 200, 200, {200, 200, 200, 255}, {210, 210, 210, 255}, "Level 2", font);
-            Button level3(renderer, 520, 40, 200, 200, {200, 200, 200, 255}, {210, 210, 210, 255}, "Level 3", font);
+
+            Button level1(renderer, 57, 300, 150, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "Level 1", font, 5, {0, 0, 0, 255});
+            Button level2(renderer, 247, 300, 150, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "Level 2", font, 5, {0, 0, 0, 255});
+            Button level3(renderer, 437, 300, 150, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "Level 3", font, 5, {0, 0, 0, 255});
+            Button level4(renderer, 627, 300, 150, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "Level 4", font, 5, {0, 0, 0, 255});
+            Button level5(renderer, 817, 300, 150, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "Coming Soon", font, 5, {0, 0, 0, 255});
+            Button shop(renderer, 387, 400, 250, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "Shop", font, 5, {0, 0, 0, 255});
             SDL_Event event;
             while (SDL_PollEvent(&event))
             {
                 if (level1.handleEvent(event))
                 {
+                    sprites.clear();
+                    map.clear();
+                    mapCeiling.clear();
+                    mapFloors.clear();
                     deserialize("map.dat");
                     deserializeSprites("sprites.dat");
+                    player = {{80.0f, 80.0f}, 0.0f, 60};
+                    levelMoney = 0;
+                    health = 100;
+                    bombCount = 0;
+                    keyCount = 0;
                     level = 1;
                 }
                 if (level2.handleEvent(event))
                 {
+                    sprites.clear();
+                    map.clear();
+                    mapCeiling.clear();
+                    mapFloors.clear();
                     deserialize("map2.dat");
                     deserializeSprites("sprites2.dat");
+                    player = {{80.0f, 80.0f}, 0.0f, 60};
+                    levelMoney = 0;
+                    health = 100;
+                    bombCount = 0;
+                    keyCount = 0;
                     level = 2;
                 }
                 if (level3.handleEvent(event))
                 {
+                    sprites.clear();
+                    map.clear();
+                    mapCeiling.clear();
+                    mapFloors.clear();
                     deserialize("map3.dat");
                     deserializeSprites("sprites3.dat");
+                    player = {{80.0f, 80.0f}, 0.0f, 60};
+                    levelMoney = 0;
+                    health = 100;
+                    bombCount = 0;
+                    keyCount = 0;
                     level = 3;
+                }
+                if (level4.handleEvent(event))
+                {
+                    sprites.clear();
+                    map.clear();
+                    mapCeiling.clear();
+                    mapFloors.clear();
+                    deserialize("map4.dat");
+                    deserializeSprites("sprites4.dat");
+                    player = {{80.0f, 80.0f}, 0.0f, 60};
+                    levelMoney = 0;
+                    level = 4;
+                }
+                if (shop.handleEvent(event))
+                {
+                    deserialize("map4.dat");
+                    deserializeSprites("sprites4.dat");
+                    level = -1;
                 }
             }
             SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
             SDL_RenderClear(renderer);
 
+            SDL_RenderCopy(renderer, background, NULL, NULL);
+
             level1.render();
             level2.render();
             level3.render();
+            level4.render();
+            level5.render();
+            shop.render();
+
+            SDL_RenderCopy(renderer, titleText, NULL, &titleRect);
+
+            SDL_RenderPresent(renderer);
+
+            SDL_Delay(16);
+            continue;
+        }
+        else if (level == -1)
+        {
+            Button back(renderer, 57, 400, 150, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "Back", font, 5, {0, 0, 0, 255});
+
+            SDL_Event event;
+            while (SDL_PollEvent(&event))
+            {
+                if (back.handleEvent(event))
+                {
+                    level = 0;
+                }
+            }
+
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+            SDL_RenderClear(renderer);
+
+            std::string text = "Money: " + std::to_string(money);
+            SDL_Surface *textSurface = TTF_RenderText_Solid(font, text.c_str(), coinTextColor);
+            if (!textSurface)
+            {
+                printf("Error rendering text: %s\n", TTF_GetError());
+                return 1;
+            }
+
+            SDL_Texture *coinText = SDL_CreateTextureFromSurface(renderer, textSurface);
+
+            SDL_Rect textRect = {20, 20, textSurface->w, textSurface->h};
+            SDL_RenderCopy(renderer, coinText, NULL, &textRect);
+
+            SDL_FreeSurface(textSurface);
+            SDL_DestroyTexture(coinText);
+
+            back.render();
 
             SDL_RenderPresent(renderer);
 
@@ -1075,7 +1265,7 @@ int main()
         }
         if (health <= 0)
         {
-            gameRunning = false;
+            level = 0;
             continue;
         }
 
@@ -1087,25 +1277,52 @@ int main()
                 gameRunning = false;
             }
 
-            else if (event.type == SDL_MOUSEBUTTONDOWN)
+            else if (event.type == SDL_KEYDOWN)
             {
 
-                if (event.button.button == SDL_BUTTON_LEFT)
+                SDL_Keycode key = event.key.keysym.sym;
+                if (key == SDLK_SPACE)
                 {
-                    if (std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - lastBulletTime).count() < shootingCooldown)
-                        continue;
-                    lastBulletTime = std::chrono::high_resolution_clock::now();
+                    if (gunType == Pistol)
+                    {
+                        if (std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - lastBulletTime).count() < pistolShootingCooldown)
+                            continue;
+                        lastBulletTime = std::chrono::high_resolution_clock::now();
 
-                    Sprite bullet;
-                    bullet.active = true;
-                    bullet.type = Bullet;
-                    bullet.x = player.pos.x;
-                    bullet.y = player.pos.y;
-                    bullet.scaleX = 0.5;
-                    bullet.scaleY = 0.5;
-                    bullet.z = 7;
-                    bullet.direction = player.angle;
-                    sprites.emplace_back(bullet);
+                        Sprite bullet;
+                        bullet.active = true;
+                        bullet.type = Bullet;
+                        bullet.x = player.pos.x;
+                        bullet.y = player.pos.y;
+                        bullet.scaleX = 0.5;
+                        bullet.scaleY = 0.5;
+                        bullet.z = 7;
+                        bullet.direction = player.angle;
+                        sprites.emplace_back(bullet);
+                    }
+                    else if (gunType == Shotgun)
+                    {
+                        if (std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - lastBulletTime).count() < shotgunShootingCooldown)
+                            continue;
+                        lastBulletTime = std::chrono::high_resolution_clock::now();
+
+                        Sprite bullet;
+                        bullet.active = true;
+                        bullet.type = Bullet;
+                        bullet.x = player.pos.x;
+                        bullet.y = player.pos.y;
+                        bullet.scaleX = 0.5;
+                        bullet.scaleY = 0.5;
+                        bullet.z = 7;
+                        bullet.direction = player.angle;
+                        sprites.emplace_back(bullet);
+
+                        bullet.direction = player.angle + 10;
+                        sprites.emplace_back(bullet);
+
+                        bullet.direction = player.angle - 10;
+                        sprites.emplace_back(bullet);
+                    }
                 }
             }
         }
@@ -1150,7 +1367,7 @@ int main()
         SDL_Rect textRect = {20, 20, textSurface->w, textSurface->h};
         SDL_RenderCopy(renderer, healthText, NULL, &textRect);
 
-        text = "Money: " + std::to_string(money);
+        text = "Money: " + std::to_string(levelMoney + money);
         textSurface = TTF_RenderText_Solid(font, text.c_str(), coinTextColor);
         if (!textSurface)
         {
