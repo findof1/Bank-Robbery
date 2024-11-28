@@ -2,6 +2,7 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL_image.h>
+#include <SDL2/SDL_mixer.h>
 #include <iostream>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -148,9 +149,13 @@ struct Sprite
     std::optional<std::chrono::_V2::system_clock::time_point> enemyLastBulletTime;
     std::optional<std::chrono::_V2::system_clock::time_point> enemyLastMeleeTime;
     std::optional<bool> move;
+    std::optional<int> soundChannel;
 };
 
 std::vector<Sprite> sprites;
+std::vector<Mix_Chunk *> sounds;
+int playerStepChannel = -1;
+int musicChannel = -1;
 
 auto currentTime = std::chrono::high_resolution_clock::now();
 auto lastTime = std::chrono::high_resolution_clock::now();
@@ -694,6 +699,7 @@ void drawSprites(SDL_Renderer *renderer, Player *player)
             float distance = sqrt(pow(sprites[i].x - player->pos.x, 2) + pow(sprites[i].y - player->pos.y, 2));
             if (distance < 15)
             {
+                Mix_PlayChannel(-1, sounds.at(0), 0);
                 sprites[i].active = false;
                 levelMoney += 5;
             }
@@ -777,6 +783,14 @@ void drawSprites(SDL_Renderer *renderer, Player *player)
 
         if ((sprites[i].type == Enemy || sprites[i].type == ShooterEnemy) && sprites[i].move == true)
         {
+            if (!sprites[i].soundChannel.has_value())
+            {
+                sprites[i].soundChannel = Mix_PlayChannel(-1, sounds.at(3), 0);
+            }
+            if (!Mix_Playing(sprites[i].soundChannel.value()))
+            {
+                sprites[i].soundChannel = Mix_PlayChannel(-1, sounds.at(3), 0);
+            }
             if (sprites[i].health <= 0)
             {
                 if (sprites[i].type == Enemy)
@@ -849,6 +863,7 @@ void drawSprites(SDL_Renderer *renderer, Player *player)
             bullet.z = 7;
             bullet.direction = angle;
             sprites.emplace_back(bullet);
+            Mix_PlayChannel(-1, sounds.at(1), 0);
         }
 
         float spriteX = sprites[i].x - player->pos.x;
@@ -907,9 +922,17 @@ void drawSprites(SDL_Renderer *renderer, Player *player)
 
                 if (static_cast<int>(glm::clamp((recX * (player->FOV / rayStep)) / 1024, 0.f, (player->FOV / rayStep))) - 1 >= 0 && static_cast<int>(glm::clamp((recX * (player->FOV / rayStep)) / 1024, 0.f, (player->FOV / rayStep))) - 1 <= (player->FOV / rayStep) && distance < distances.at(static_cast<int>(glm::clamp((recX * (player->FOV / rayStep)) / 1024, 0.f, (player->FOV / rayStep))) - 1))
                 {
-                    if ((sprites[i].type == Enemy || sprites[i].type == ShooterEnemy) && sprites[i].move == false)
+
+                    if ((sprites[i].type == Enemy || sprites[i].type == ShooterEnemy) && sprites[i].move == false && recX < 1024)
                     {
-                        sprites[i].move = true;
+                        float deltaX = player->pos.x - sprites[i].x;
+                        float deltaY = player->pos.y - sprites[i].y;
+
+                        float distancePlayer = std::sqrt(deltaX * deltaX + deltaY * deltaY);
+                        if (distancePlayer < 1000)
+                        {
+                            sprites[i].move = true;
+                        }
                     }
 
                     for (int y = 0; y < loadedTextures[textureIndex].height; y++)
@@ -938,6 +961,17 @@ void handleInput(Player *player)
 {
     const Uint8 *keystate = SDL_GetKeyboardState(NULL);
 
+    if (keystate[SDL_SCANCODE_W] || keystate[SDL_SCANCODE_S] || keystate[SDL_SCANCODE_Q] || keystate[SDL_SCANCODE_E] || keystate[SDL_SCANCODE_LEFT] || keystate[SDL_SCANCODE_RIGHT])
+    {
+        if (playerStepChannel == -1)
+        {
+            playerStepChannel = Mix_PlayChannel(-1, sounds.at(3), 0);
+        }
+        if (!Mix_Playing(playerStepChannel))
+        {
+            playerStepChannel = Mix_PlayChannel(-1, sounds.at(3), 0);
+        }
+    }
     if (keystate[SDL_SCANCODE_LSHIFT])
     {
         rotateSpeed = rotateSpeedSlow;
@@ -1020,6 +1054,7 @@ void handleInput(Player *player)
         }
         if ((map[mapCellIndex] == 9 || map[mapCellIndex] == 12) && bombCount > 0)
         {
+            Mix_PlayChannel(-1, sounds.at(2), 0);
             map[mapCellIndex] = 0;
             bombCount -= 1;
         }
@@ -1052,6 +1087,56 @@ int main()
         SDL_Quit();
         return 1;
     }
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0)
+    {
+        std::cerr << "Failed to initialize SDL_mixer: " << Mix_GetError() << "\n";
+        return 1;
+    }
+
+    Mix_Chunk *coinSound = Mix_LoadWAV("./sounds/pickupCoin.wav");
+    if (!coinSound)
+    {
+        std::cerr << "Failed to load sound: " << Mix_GetError() << "\n";
+        return 1;
+    }
+    Mix_VolumeChunk(coinSound, 32);
+    sounds.emplace_back(coinSound);
+
+    Mix_Chunk *shootSound = Mix_LoadWAV("./sounds/shoot.wav");
+    if (!shootSound)
+    {
+        std::cerr << "Failed to load sound: " << Mix_GetError() << "\n";
+        return 1;
+    }
+    Mix_VolumeChunk(shootSound, 32);
+    sounds.emplace_back(shootSound);
+
+    Mix_Chunk *explosionSound = Mix_LoadWAV("./sounds/explosion.wav");
+    if (!explosionSound)
+    {
+        std::cerr << "Failed to load sound: " << Mix_GetError() << "\n";
+        return 1;
+    }
+    Mix_VolumeChunk(explosionSound, 64);
+    sounds.emplace_back(explosionSound);
+
+    Mix_Chunk *stepSound = Mix_LoadWAV("./sounds/step.wav");
+    if (!stepSound)
+    {
+        std::cerr << "Failed to load sound: " << Mix_GetError() << "\n";
+        return 1;
+    }
+    Mix_VolumeChunk(stepSound, 14);
+    sounds.emplace_back(stepSound);
+
+    Mix_Chunk *music = Mix_LoadWAV("./sounds/song.wav");
+    if (!music)
+    {
+        std::cerr << "Failed to load sound: " << Mix_GetError() << "\n";
+        return 1;
+    }
+    Mix_VolumeChunk(music, 64);
+    sounds.emplace_back(music);
 
     SDL_Window *window = SDL_CreateWindow("It's a Bank Robbery", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1024, 512, SDL_WINDOW_SHOWN);
     if (!window)
@@ -1104,6 +1189,19 @@ int main()
     SDL_SetTextureBlendMode(background, SDL_BLENDMODE_BLEND);
     SDL_SetTextureAlphaMod(background, 100);
 
+    SDL_Texture *crosshair = IMG_LoadTexture(renderer, "./textures/crosshair.png");
+    if (!crosshair)
+    {
+        SDL_Log("Unable to load crosshair image: %s", IMG_GetError());
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(window);
+        IMG_Quit();
+        SDL_Quit();
+        return 1;
+    }
+    SDL_SetTextureBlendMode(crosshair, SDL_BLENDMODE_BLEND);
+    SDL_SetTextureAlphaMod(crosshair, 255);
+
     std::string title = "It's a Bank Robbery";
     SDL_Surface *titleTextSurface = TTF_RenderText_Solid(font, title.c_str(), {255, 255, 255, 255});
     if (!titleTextSurface)
@@ -1122,6 +1220,15 @@ int main()
     lastTime = std::chrono::high_resolution_clock::now();
     while (gameRunning)
     {
+        if (musicChannel == -1)
+        {
+            musicChannel = Mix_PlayChannel(-1, sounds.at(4), 0);
+        }
+        if (!Mix_Playing(musicChannel))
+        {
+            musicChannel = Mix_PlayChannel(-1, sounds.at(4), 0);
+        }
+
         distances.clear();
         currentTime = std::chrono::high_resolution_clock::now();
         std::chrono::duration<float> elapsed = currentTime - startTime;
@@ -1323,6 +1430,7 @@ int main()
                         bullet.direction = player.angle - 10;
                         sprites.emplace_back(bullet);
                     }
+                    Mix_PlayChannel(-1, sounds.at(1), 0);
                 }
             }
         }
@@ -1384,11 +1492,18 @@ int main()
         SDL_DestroyTexture(healthText);
         SDL_DestroyTexture(coinText);
 
+        SDL_Rect crosshairRect = {512 - 5, 256 - 5, 10, 10};
+        SDL_RenderCopy(renderer, crosshair, NULL, &crosshairRect);
+
         SDL_RenderPresent(renderer);
 
         SDL_Delay(16);
     }
-
+    for (auto sound : sounds)
+    {
+        Mix_FreeChunk(sound);
+    }
+    Mix_CloseAudio();
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
