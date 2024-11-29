@@ -1,7 +1,6 @@
 #pragma once
-#include <vector>
 #include "types.h"
-
+#include <vector>
 std::vector<Texture> loadedTextures;
 float deltaTime;
 
@@ -62,7 +61,7 @@ int enemyShootingCooldown = 500;
 int pistolShootingCooldown = 500;
 int shotgunShootingCooldown = 1000;
 int minigunShootingCooldown = 75;
-auto lastBulletTime = std::chrono::high_resolution_clock::now();
+std::chrono::_V2::system_clock::time_point lastBulletTime = std::chrono::high_resolution_clock::now();
 int gunDamage = 5;
 int gunType = Pistol;
 bool spacePressed = false;
@@ -74,5 +73,5 @@ std::vector<Mix_Chunk *> sounds;
 int playerStepChannel = -1;
 int musicChannel = -1;
 
-auto currentTime = std::chrono::high_resolution_clock::now();
-auto lastTime = std::chrono::high_resolution_clock::now();
+std::chrono::_V2::system_clock::time_point currentTime = std::chrono::high_resolution_clock::now();
+std::chrono::_V2::system_clock::time_point lastTime = std::chrono::high_resolution_clock::now();

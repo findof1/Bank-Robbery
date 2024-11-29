@@ -1,6 +1,11 @@
 #pragma once
 #include "globals.h"
 #include "types.h"
+#include "stb_image.h"
+#include <iostream>
+#include <fstream>
+#include <string>
+
 void loadTextures()
 {
   for (const auto &filepath : textureFilepaths)
