@@ -21,6 +21,19 @@ void loadTextures()
   }
 }
 
+int getCell(int x, int y)
+{
+  if (x >= 0 && x < mapX && y >= 0 && y < mapY)
+  {
+    int cellIndex = y * mapX + x;
+    return cellIndex;
+  }
+  else
+  {
+    return -1;
+  }
+}
+
 void deserialize(const std::string &filename)
 {
   std::ifstream file(filename, std::ios::binary | std::ios::in);
@@ -50,6 +63,33 @@ void deserialize(const std::string &filename)
   {
     std::cerr << "Error opening file for reading.\n";
   }
+
+  for (int x = 0; x < mapX; x++)
+  {
+    for (int y = 0; y < mapY; y++)
+    {
+      if (mapFloors[getCell(x, y)] == 18)
+      {
+        float gridWidth = 16;
+        float gridHeight = 16;
+
+        for (int i = 0; i < 3; i++)
+        {
+          for (int j = 0; j < 3; j++)
+          {
+            Sprite spike;
+            spike.x = i * gridWidth + x * cellWidth + 16;
+            spike.y = j * gridHeight + y * cellWidth + 16;
+            spike.type = Spike;
+            spike.enemyLastMeleeTime = std::chrono::high_resolution_clock::now();
+            spike.enemyLastBulletTime = std::chrono::high_resolution_clock::now();
+            spike.z = 19;
+            sprites.emplace_back(spike);
+          }
+        }
+      }
+    }
+  }
 }
 
 void deserializeSprites(const std::string &filename)
@@ -65,7 +105,7 @@ void deserializeSprites(const std::string &filename)
       Sprite sprite;
       int type;
       file.read(reinterpret_cast<char *>(&type), sizeof(int));
-      if (type - 1 < 0 || type - 1 > static_cast<int>(SpriteType::Coin))
+      if (type - 1 < 0 || type - 1 > static_cast<int>(SpriteType::GoldBar))
       {
         invalid = true;
       }
@@ -74,7 +114,7 @@ void deserializeSprites(const std::string &filename)
       file.read(reinterpret_cast<char *>(&sprite.x), sizeof(float));
       file.read(reinterpret_cast<char *>(&sprite.y), sizeof(float));
       file.read(reinterpret_cast<char *>(&sprite.z), sizeof(float));
-      if (sprite.type == Enemy || sprite.type == ShooterEnemy)
+      if (sprite.type == Enemy || sprite.type == ShooterEnemy || sprite.type == HammerEnemy)
       {
         sprite.z = 20;
       }
@@ -88,6 +128,14 @@ void deserializeSprites(const std::string &filename)
       {
         sprite.health = 20;
       }
+      if (sprite.type == HammerEnemy && hasHealth == false)
+      {
+        sprite.health = 50;
+      }
+      if (sprite.type == DroneEnemy && hasHealth == false)
+      {
+        sprite.health = 1;
+      }
       if (sprite.type == ShooterEnemy && hasHealth == false)
       {
         sprite.health = 5;
@@ -100,6 +148,23 @@ void deserializeSprites(const std::string &filename)
       }
       if (sprite.type == Enemy)
       {
+        sprite.enemyLastMeleeTime = std::chrono::high_resolution_clock::now();
+        sprite.move = false;
+      }
+      if (sprite.type == DroneEnemy)
+      {
+        sprite.move = false;
+      }
+      if (sprite.type == Spike)
+      {
+        sprite.enemyLastMeleeTime = std::chrono::high_resolution_clock::now();
+        sprite.enemyLastBulletTime = std::chrono::high_resolution_clock::now();
+        sprite.z = 19;
+      }
+      if (sprite.type == HammerEnemy)
+      {
+        sprite.scaleX = 1.2;
+        sprite.scaleY = 1.2;
         sprite.enemyLastMeleeTime = std::chrono::high_resolution_clock::now();
         sprite.move = false;
       }
@@ -143,14 +208,14 @@ void getRGBFromTexture(int hitType, int x, int y, uint8_t &r, uint8_t &g, uint8_
 {
   if (hitType < 1 || hitType > loadedTextures.size())
   {
-    std::cerr << "Invalid hitType: " << hitType << std::endl;
+    // std::cerr << "Invalid hitType: " << hitType << std::endl;
     return;
   }
 
   const Texture &tex = loadedTextures[hitType - 1];
   if (x < 0 || x >= tex.width || y < 0 || y >= tex.height)
   {
-    std::cerr << "Coordinates out of bounds: " << x << ", " << y << std::endl;
+    // std::cerr << "Coordinates out of bounds: " << x << ", " << y << std::endl;
     return;
   }
 
@@ -164,14 +229,14 @@ void getRGBFromTexture(int hitType, int x, int y, uint8_t &r, uint8_t &g, uint8_
 {
   if (hitType < 1 || hitType > loadedTextures.size())
   {
-    std::cerr << "Invalid hitType: " << hitType << std::endl;
+    // std::cerr << "Invalid hitType: " << hitType << std::endl;
     return;
   }
 
   const Texture &tex = loadedTextures[hitType - 1];
   if (x < 0 || x >= tex.width || y < 0 || y >= tex.height)
   {
-    std::cerr << "Coordinates out of bounds: " << x << ", " << y << std::endl;
+    // std::cerr << "Coordinates out of bounds: " << x << ", " << y << std::endl;
     return;
   }
 
@@ -183,47 +248,6 @@ void getRGBFromTexture(int hitType, int x, int y, uint8_t &r, uint8_t &g, uint8_
 }
 
 float degToRad(float angle) { return angle * M_PI / 180.0; }
-
-int getCell(int x, int y)
-{
-  if (x >= 0 && x < mapX && y >= 0 && y < mapY)
-  {
-    int cellIndex = y * mapX + x;
-    return cellIndex;
-  }
-  else
-  {
-    return -1;
-  }
-}
-
-void drawMap(SDL_Renderer *renderer)
-{
-  for (int y = 0; y < mapY; y++)
-  {
-    for (int x = 0; x < mapX; x++)
-    {
-      int cell = getCell(x, y);
-
-      if (map[cell] == 1)
-      {
-        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-      }
-      else
-      {
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-      }
-
-      SDL_Rect rect;
-      rect.x = x * cellWidth;
-      rect.y = y * cellWidth;
-      rect.w = cellWidth;
-      rect.h = cellWidth;
-
-      SDL_RenderFillRect(renderer, &rect);
-    }
-  }
-}
 
 SDL_Texture *loadImage(SDL_Window *window, SDL_Renderer *renderer, std::string filepath)
 {

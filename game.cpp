@@ -69,7 +69,7 @@ void Game::run()
 
     if (level == 0)
     {
-      displayMainMenu(renderer, &player, font, background, titleText, titleRect);
+      displayMainMenu(renderer, font, background, titleText, titleRect);
       continue;
     }
     else if (level == -1)
@@ -92,11 +92,10 @@ void Game::run()
       }
     }
 
-    handleInput(&player);
+    handleInput();
 
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
-    // drawMap(renderer);
 
     SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
     SDL_Rect bottomBackground;
@@ -114,10 +113,9 @@ void Game::run()
     topBackground.w = 1024;
     SDL_RenderFillRect(renderer, &topBackground);
 
-    raycast(&player, renderer);
-    // SDL_RenderDrawPoint(renderer, static_cast<int>(player.pos.x), static_cast<int>(player.pos.y));
+    raycast(renderer);
 
-    drawSprites(renderer, &player);
+    handleSprites(renderer);
 
     std::string text = "Health: " + std::to_string(health);
     SDL_Surface *textSurface = TTF_RenderText_Solid(font, text.c_str(), healthTextColor);
@@ -225,14 +223,14 @@ void Game::initIcon(SDL_Window *window)
   }
 }
 
-void Game::raycast(Player *player, SDL_Renderer *renderer)
+void Game::raycast(SDL_Renderer *renderer)
 {
-  float rayAngle = FixAngle(player->angle - (player->FOV / 2));
+  float rayAngle = FixAngle(player.angle - (player.FOV / 2));
 
-  for (float i = 0; i < player->FOV; i += rayStep)
+  for (float i = 0; i < player.FOV; i += rayStep)
   {
-    float rayX = player->pos.x;
-    float rayY = player->pos.y;
+    float rayX = player.pos.x;
+    float rayY = player.pos.y;
     float dy;
     float dx;
 
@@ -281,14 +279,14 @@ void Game::raycast(Player *player, SDL_Renderer *renderer)
         hitTypeHorizontal = map[mapCellIndex];
         depth = maxDepth;
         mappedPosHorizontal = static_cast<int>((rayX - cellIndexX * cellWidth) / 2.0f);
-        distanceHorizontal = sqrt(pow(rayX - player->pos.x, 2) + pow(rayY - player->pos.y, 2));
+        distanceHorizontal = sqrt(pow(rayX - player.pos.x, 2) + pow(rayY - player.pos.y, 2));
       }
       if (map[getCell(cellIndexX, cellIndexY - 1)] != 0)
       {
         hitTypeHorizontal = map[getCell(cellIndexX, cellIndexY - 1)];
         depth = maxDepth;
         mappedPosHorizontal = static_cast<int>((rayX - cellIndexX * cellWidth) / 2.0f);
-        distanceHorizontal = sqrt(pow(rayX - player->pos.x, 2) + pow(rayY - player->pos.y, 2));
+        distanceHorizontal = sqrt(pow(rayX - player.pos.x, 2) + pow(rayY - player.pos.y, 2));
       }
       depth++;
     }
@@ -300,8 +298,8 @@ void Game::raycast(Player *player, SDL_Renderer *renderer)
     int mappedPosVertical;
     int hitTypeVertical;
 
-    rayX = player->pos.x;
-    rayY = player->pos.y;
+    rayX = player.pos.x;
+    rayY = player.pos.y;
 
     float distanceVertical = 10000000;
 
@@ -345,30 +343,30 @@ void Game::raycast(Player *player, SDL_Renderer *renderer)
         hitTypeVertical = map[mapCellIndex];
         depth = maxDepth;
         mappedPosVertical = static_cast<int>((rayY - cellIndexY * cellWidth) / 2.0f);
-        distanceVertical = sqrt(pow(rayX - player->pos.x, 2) + pow(rayY - player->pos.y, 2));
+        distanceVertical = sqrt(pow(rayX - player.pos.x, 2) + pow(rayY - player.pos.y, 2));
       }
       if (map[getCell(cellIndexX - 1, cellIndexY)] != 0)
       {
         hitTypeVertical = map[getCell(cellIndexX - 1, cellIndexY)];
         depth = maxDepth;
         mappedPosVertical = static_cast<int>((rayY - cellIndexY * cellWidth) / 2.0f);
-        distanceVertical = sqrt(pow(rayX - player->pos.x, 2) + pow(rayY - player->pos.y, 2));
+        distanceVertical = sqrt(pow(rayX - player.pos.x, 2) + pow(rayY - player.pos.y, 2));
       }
       depth++;
     }
 
     /*
 SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-SDL_RenderDrawLine(renderer, player->pos.x, player->pos.y, horizontalRayX, horizontalRayY);
+SDL_RenderDrawLine(renderer, player.pos.x, player.pos.y, horizontalRayX, horizontalRayY);
 SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
-SDL_RenderDrawLine(renderer, player->pos.x, player->pos.y, rayX, rayY);
+SDL_RenderDrawLine(renderer, player.pos.x, player.pos.y, rayX, rayY);
 */
     int mappedPos;
     int hitType;
     // SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
     if (distanceVertical < distanceHorizontal)
     {
-      // SDL_RenderDrawLine(renderer, player->pos.x, player->pos.y, horizontalRayX, horizontalRayY);
+      // SDL_RenderDrawLine(renderer, player.pos.x, player.pos.y, horizontalRayX, horizontalRayY);
       mappedPos = mappedPosVertical;
       hitType = hitTypeVertical;
       SDL_SetRenderDrawColor(renderer, 0, 155, 0, 255);
@@ -378,17 +376,17 @@ SDL_RenderDrawLine(renderer, player->pos.x, player->pos.y, rayX, rayY);
       mappedPos = mappedPosHorizontal;
       hitType = hitTypeHorizontal;
       SDL_SetRenderDrawColor(renderer, 0, 100, 0, 255);
-      // SDL_RenderDrawLine(renderer, player->pos.x, player->pos.y, rayX, rayY);
+      // SDL_RenderDrawLine(renderer, player.pos.x, player.pos.y, rayX, rayY);
     }
 
     float distance = std::min(distanceHorizontal, distanceVertical);
-    float correctedDistance = distance * cos(degToRad(FixAngle(player->angle - rayAngle)));
+    float correctedDistance = distance * cos(degToRad(FixAngle(player.angle - rayAngle)));
     distances.emplace_back(distance);
     SDL_FRect rectangle;
-    rectangle.x = i * (1024 / (player->FOV));
+    rectangle.x = i * (1024 / (player.FOV));
     rectangle.h = (64 * 512) / correctedDistance;
     rectangle.y = (512 / 2) - (rectangle.h / 2);
-    rectangle.w = (1024 / (player->FOV)) * rayStep;
+    rectangle.w = (1024 / (player.FOV)) * rayStep;
     // SDL_RenderFillRect(renderer, &rectangle);
 
     float smallRectHeight = rectangle.h / 32;
@@ -408,14 +406,14 @@ SDL_RenderDrawLine(renderer, player->pos.x, player->pos.y, rayX, rayY);
     }
 
     float deg = -degToRad(rayAngle);
-    float rayAngleFix = cos(degToRad(FixAngle(player->angle - rayAngle)));
-    float drawX = i * (1024 / (player->FOV));
-    float drawWidth = (1024 / (player->FOV)) * rayStep;
+    float rayAngleFix = cos(degToRad(FixAngle(player.angle - rayAngle)));
+    float drawX = i * (1024 / (player.FOV));
+    float drawWidth = (1024 / (player.FOV)) * rayStep;
     for (int y = rectangle.y + rectangle.h; y < 512; y += drawWidth / 1.5)
     {
       float dy = y - (512 / 2.0);
-      float textureX = player->pos.x / 2 + cos(deg) * 126 * 2 * 32 / dy / rayAngleFix;
-      float textureY = player->pos.y / 2 - sin(deg) * 126 * 2 * 32 / dy / rayAngleFix;
+      float textureX = player.pos.x / 2 + cos(deg) * 126 * 2 * 32 / dy / rayAngleFix;
+      float textureY = player.pos.y / 2 - sin(deg) * 126 * 2 * 32 / dy / rayAngleFix;
       int textureType = mapFloors[(int)(textureY / 32.0) * mapX + (int)(textureX / 32.0)];
       if (textureType != 0)
       {
@@ -429,8 +427,8 @@ SDL_RenderDrawLine(renderer, player->pos.x, player->pos.y, rayX, rayY);
         rectangle.w = drawWidth;
         SDL_RenderFillRectF(renderer, &rectangle);
       }
-      textureX = player->pos.x / 2 + cos(deg) * 126 * 2 * 32 / dy / rayAngleFix;
-      textureY = player->pos.y / 2 - sin(deg) * 126 * 2 * 32 / dy / rayAngleFix;
+      textureX = player.pos.x / 2 + cos(deg) * 126 * 2 * 32 / dy / rayAngleFix;
+      textureY = player.pos.y / 2 - sin(deg) * 126 * 2 * 32 / dy / rayAngleFix;
       textureType = mapCeiling[(int)(textureY / 32.0) * mapX + (int)(textureX / 32.0)];
       if (textureType != 0)
       {
@@ -450,22 +448,51 @@ SDL_RenderDrawLine(renderer, player->pos.x, player->pos.y, rayX, rayY);
   }
 }
 
-void Game::drawSprites(SDL_Renderer *renderer, Player *player)
+void Game::handleSprites(SDL_Renderer *renderer)
 {
+  glm::vec2 playerPos(player.pos.x, player.pos.y);
   std::sort(sprites.begin(), sprites.end(),
-            [player](const Sprite &a, const Sprite &b)
+            [playerPos](const Sprite &a, const Sprite &b)
             {
-              return glm::distance(glm::vec2(a.x, a.y), glm::vec2(player->pos.x, player->pos.y)) > glm::distance(glm::vec2(b.x, b.y), glm::vec2(player->pos.x, player->pos.y));
+              return glm::distance(glm::vec2(a.x, a.y), playerPos) > glm::distance(glm::vec2(b.x, b.y), playerPos);
             });
 
   for (int i = 0; i < sprites.size(); i++)
   {
+    if (sprites[i].type == Spike && sprites[i].active == false)
+    {
+      if (std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - sprites[i].enemyLastBulletTime.value()).count() > spikeTrapInterval)
+      {
+        sprites[i].active = true;
+        sprites[i].enemyLastBulletTime = std::chrono::high_resolution_clock::now();
+      }
+    }
+
     if (sprites[i].active == false)
       continue;
 
+    if (sprites[i].type == Spike)
+    {
+      if (std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - sprites[i].enemyLastBulletTime.value()).count() > spikeTrapInterval)
+      {
+        sprites[i].active = false;
+        sprites[i].enemyLastBulletTime = std::chrono::high_resolution_clock::now();
+      }
+
+      int cellIndexX = floor(sprites[i].x / cellWidth);
+      int cellIndexY = floor(sprites[i].y / cellWidth);
+      int playerCellIndexX = floor(player.pos.x / cellWidth);
+      int playerCellIndexY = floor(player.pos.y / cellWidth);
+      if (cellIndexX == playerCellIndexX && cellIndexY == playerCellIndexY && std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - sprites[i].enemyLastMeleeTime.value()).count() > 5000)
+      {
+        sprites[i].enemyLastMeleeTime = std::chrono::high_resolution_clock::now();
+        health -= 1;
+      }
+    }
+
     if (sprites[i].type == Key)
     {
-      float distance = sqrt(pow(sprites[i].x - player->pos.x, 2) + pow(sprites[i].y - player->pos.y, 2));
+      float distance = sqrt(pow(sprites[i].x - player.pos.x, 2) + pow(sprites[i].y - player.pos.y, 2));
       if (distance < 15)
       {
         sprites[i].active = false;
@@ -475,7 +502,7 @@ void Game::drawSprites(SDL_Renderer *renderer, Player *player)
 
     if (sprites[i].type == Coin)
     {
-      float distance = sqrt(pow(sprites[i].x - player->pos.x, 2) + pow(sprites[i].y - player->pos.y, 2));
+      float distance = sqrt(pow(sprites[i].x - player.pos.x, 2) + pow(sprites[i].y - player.pos.y, 2));
       if (distance < 15)
       {
         Mix_PlayChannel(-1, sounds.at(0), 0);
@@ -484,9 +511,20 @@ void Game::drawSprites(SDL_Renderer *renderer, Player *player)
       }
     }
 
+    if (sprites[i].type == GoldBar)
+    {
+      float distance = sqrt(pow(sprites[i].x - player.pos.x, 2) + pow(sprites[i].y - player.pos.y, 2));
+      if (distance < 15)
+      {
+        Mix_PlayChannel(-1, sounds.at(0), 0);
+        sprites[i].active = false;
+        levelMoney += 100;
+      }
+    }
+
     if (sprites[i].type == Bomb)
     {
-      float distance = sqrt(pow(sprites[i].x - player->pos.x, 2) + pow(sprites[i].y - player->pos.y, 2));
+      float distance = sqrt(pow(sprites[i].x - player.pos.x, 2) + pow(sprites[i].y - player.pos.y, 2));
       if (distance < 15)
       {
         sprites[i].active = false;
@@ -496,239 +534,94 @@ void Game::drawSprites(SDL_Renderer *renderer, Player *player)
 
     if (sprites[i].type == Bullet)
     {
-      float bulletSpeed = 300;
-      float dx = bulletSpeed * cos(degToRad(sprites[i].direction.value())) * deltaTime;
-      float dy = bulletSpeed * sin(degToRad(sprites[i].direction.value())) * deltaTime;
-      sprites[i].x += dx;
-      sprites[i].y += dy;
-      for (auto &sprite : sprites)
-      {
-        if ((sprite.type != Enemy && sprite.type != ShooterEnemy) || sprite.active == false)
-          continue;
-
-        float deltaX = sprite.x - sprites[i].x;
-        float deltaY = sprite.y - sprites[i].y;
-        float distance = std::sqrt(deltaX * deltaX + deltaY * deltaY);
-        if (distance < 10)
-        {
-          sprites[i].active = false;
-          sprite.health = sprite.health.value() - gunDamage;
-          break;
-        }
-      }
-
-      int cellIndexX = floor(sprites[i].x / cellWidth);
-      int cellIndexY = floor(sprites[i].y / cellWidth);
-
-      int mapCellIndex = getCell(cellIndexX, cellIndexY);
-
-      if (map[mapCellIndex] != 0)
-      {
-        sprites[i].active = false;
-      }
-
+      handleBullet(i);
       if (sprites[i].active == false)
         continue;
     }
 
     if (sprites[i].type == EnemyBullet)
     {
-      float bulletSpeed = 300;
-      float dx = bulletSpeed * cos(degToRad(sprites[i].direction.value())) * deltaTime;
-      float dy = bulletSpeed * sin(degToRad(sprites[i].direction.value())) * deltaTime;
-      sprites[i].x += dx;
-      sprites[i].y += dy;
-      float deltaX = player->pos.x - sprites[i].x;
-      float deltaY = player->pos.y - sprites[i].y;
-      float distance = std::sqrt(deltaX * deltaX + deltaY * deltaY);
-      if (distance < 10)
-      {
-        health -= 1;
-        sprites[i].active = false;
+      handleEnemyBullet(i);
+      if (sprites[i].active == false)
         continue;
-      }
-
-      int cellIndexX = floor(sprites[i].x / cellWidth);
-      int cellIndexY = floor(sprites[i].y / cellWidth);
-
-      int mapCellIndex = getCell(cellIndexX, cellIndexY);
-
-      if (map[mapCellIndex] != 0)
-      {
-        sprites[i].active = false;
-        continue;
-      }
     }
 
-    if ((sprites[i].type == Enemy || sprites[i].type == ShooterEnemy) && sprites[i].move == true)
+    if ((sprites[i].type == Enemy || sprites[i].type == ShooterEnemy || sprites[i].type == HammerEnemy || sprites[i].type == DroneEnemy) && sprites[i].move == true)
     {
-      if (!sprites[i].soundChannel.has_value())
-      {
-        sprites[i].soundChannel = Mix_PlayChannel(-1, sounds.at(3), 0);
-      }
-      if (!Mix_Playing(sprites[i].soundChannel.value()))
-      {
-        sprites[i].soundChannel = Mix_PlayChannel(-1, sounds.at(3), 0);
-      }
-      if (sprites[i].health <= 0)
-      {
-        if (sprites[i].type == Enemy)
-        {
-          levelMoney += 1;
-        }
-        else if (sprites[i].type == ShooterEnemy)
-        {
-          levelMoney += 2;
-        }
-        sprites[i].active = false;
+      handleEnemyMovement(i);
+      if (sprites[i].active == false)
         continue;
-      }
-
-      float deltaX = player->pos.x - sprites[i].x;
-      float deltaY = player->pos.y - sprites[i].y;
-
-      float distance = std::sqrt(deltaX * deltaX + deltaY * deltaY);
-      if (distance < 10 && std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - sprites[i].enemyLastMeleeTime.value()).count() > 1000)
-      {
-        sprites[i].enemyLastMeleeTime = std::chrono::high_resolution_clock::now();
-        health -= 5;
-      }
-
-      if (distance > 0)
-      {
-        deltaX /= distance;
-        deltaY /= distance;
-
-        float enemySpeed = 35;
-        float newX = sprites[i].x + deltaX * enemySpeed * deltaTime;
-        float newY = sprites[i].y + deltaY * enemySpeed * deltaTime;
-
-        int cellIndexX = floor(newX / cellWidth);
-        int cellIndexY = floor(sprites[i].y / cellWidth);
-        int mapCellIndexX = getCell(cellIndexX, cellIndexY);
-
-        if (map[mapCellIndexX] == 0)
-        {
-          sprites[i].x = newX;
-        }
-
-        cellIndexX = floor(sprites[i].x / cellWidth);
-        cellIndexY = floor(newY / cellWidth);
-        int mapCellIndexY = getCell(cellIndexX, cellIndexY);
-
-        if (map[mapCellIndexY] == 0)
-        {
-          sprites[i].y = newY;
-        }
-      }
     }
 
     if (sprites[i].type == ShooterEnemy && std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - sprites[i].enemyLastBulletTime.value()).count() > enemyShootingCooldown && sprites[i].move == true)
     {
-      sprites[i].enemyLastBulletTime = std::chrono::high_resolution_clock::now();
-
-      float deltaX = player->pos.x - sprites[i].x;
-      float deltaY = player->pos.y - sprites[i].y;
-
-      float angle = atan2(deltaY, deltaX) * (180 / M_PI);
-
-      Sprite bullet;
-      bullet.active = true;
-      bullet.type = EnemyBullet;
-      bullet.x = sprites[i].x;
-      bullet.y = sprites[i].y;
-      bullet.scaleX = 0.5;
-      bullet.scaleY = 0.5;
-      bullet.z = 7;
-      bullet.direction = angle;
-      sprites.emplace_back(bullet);
-      Mix_PlayChannel(-1, sounds.at(1), 0);
+      handleShooterEnemy(i);
     }
 
-    float spriteX = sprites[i].x - player->pos.x;
-    float spriteY = sprites[i].y - player->pos.y;
-    float spriteZ = sprites[i].z;
+    renderSprite(i);
+  }
+}
 
-    float angleRad = -degToRad(player->angle);
-    float rotatedX = spriteY * cos(angleRad) + spriteX * sin(angleRad);
-    float rotatedY = spriteX * cos(angleRad) - spriteY * sin(angleRad);
+void Game::renderSprite(int i)
+{
+  float spriteX = sprites[i].x - player.pos.x;
+  float spriteY = sprites[i].y - player.pos.y;
+  float spriteZ = sprites[i].z;
 
-    if (rotatedY > 0)
+  float angleRad = -degToRad(player.angle);
+  float rotatedX = spriteY * cos(angleRad) + spriteX * sin(angleRad);
+  float rotatedY = spriteX * cos(angleRad) - spriteY * sin(angleRad);
+
+  if (rotatedY > 0)
+  {
+
+    float fovFactor = 512.0f / tan(degToRad(player.FOV / 2));
+
+    float projectedX = (rotatedX * fovFactor / rotatedY) + (1024 / 2);
+    float projectedY = (spriteZ * fovFactor / rotatedY) + (512 / 2);
+
+    float distance = sqrt(pow(spriteX, 2) + pow(spriteY, 2));
+
+    float preCalculatedWidth = ((1024 / (player.FOV)) * rayStep + (1024.f / distance)) * 0.45 * sprites[i].scaleX;
+    float preCalculatedHeight = ((1024 / (player.FOV)) * rayStep + (1024.f / distance)) * 0.45 * sprites[i].scaleX;
+
+    int textureIndex = getSpriteTextureIndex(sprites[i].type);
+
+    for (int x = 0; x < loadedTextures[textureIndex].width; x++)
     {
+      float recX = projectedX + ((x * (256 * sprites[i].scaleX)) / distance);
 
-      float fovFactor = 512.0f / tan(degToRad(player->FOV / 2));
+      recX -= ((preCalculatedWidth * loadedTextures[textureIndex].width) / 8);
 
-      float projectedX = (rotatedX * fovFactor / rotatedY) + (1024 / 2);
-      float projectedY = (spriteZ * fovFactor / rotatedY) + (512 / 2);
-
-      float distance = sqrt(pow(spriteX, 2) + pow(spriteY, 2));
-
-      float preCalculatedWidth = ((1024 / (player->FOV)) * rayStep + (1024.f / distance)) * 0.45 * sprites[i].scaleX;
-      float preCalculatedHeight = ((1024 / (player->FOV)) * rayStep + (1024.f / distance)) * 0.45 * sprites[i].scaleX;
-
-      int textureIndex;
-
-      if (sprites[i].type == Key)
+      if (static_cast<int>(glm::clamp((recX * (player.FOV / rayStep)) / 1024, 0.f, (player.FOV / rayStep))) - 1 >= 0 && static_cast<int>(glm::clamp((recX * (player.FOV / rayStep)) / 1024, 0.f, (player.FOV / rayStep))) - 1 <= (player.FOV / rayStep) && distance < distances.at(static_cast<int>(glm::clamp((recX * (player.FOV / rayStep)) / 1024, 0.f, (player.FOV / rayStep))) - 1))
       {
-        textureIndex = 20;
-      }
 
-      if (sprites[i].type == Coin)
-      {
-        textureIndex = 21;
-      }
-
-      if (sprites[i].type == Bomb)
-      {
-        textureIndex = 18;
-      }
-
-      if (sprites[i].type == Bullet || sprites[i].type == EnemyBullet)
-      {
-        textureIndex = 19;
-      }
-
-      if (sprites[i].type == Enemy || sprites[i].type == ShooterEnemy)
-      {
-        textureIndex = 17;
-      }
-
-      for (int x = 0; x < loadedTextures[textureIndex].width; x++)
-      {
-        float recX = projectedX + ((x * (256 * sprites[i].scaleX)) / distance);
-
-        recX -= ((preCalculatedWidth * loadedTextures[textureIndex].width) / 8);
-
-        if (static_cast<int>(glm::clamp((recX * (player->FOV / rayStep)) / 1024, 0.f, (player->FOV / rayStep))) - 1 >= 0 && static_cast<int>(glm::clamp((recX * (player->FOV / rayStep)) / 1024, 0.f, (player->FOV / rayStep))) - 1 <= (player->FOV / rayStep) && distance < distances.at(static_cast<int>(glm::clamp((recX * (player->FOV / rayStep)) / 1024, 0.f, (player->FOV / rayStep))) - 1))
+        if ((sprites[i].type == Enemy || sprites[i].type == ShooterEnemy || sprites[i].type == HammerEnemy || sprites[i].type == DroneEnemy) && sprites[i].move == false && recX < 1024)
         {
+          float deltaX = player.pos.x - sprites[i].x;
+          float deltaY = player.pos.y - sprites[i].y;
 
-          if ((sprites[i].type == Enemy || sprites[i].type == ShooterEnemy) && sprites[i].move == false && recX < 1024)
+          float distancePlayer = std::sqrt(deltaX * deltaX + deltaY * deltaY);
+          if (distancePlayer < 1000)
           {
-            float deltaX = player->pos.x - sprites[i].x;
-            float deltaY = player->pos.y - sprites[i].y;
-
-            float distancePlayer = std::sqrt(deltaX * deltaX + deltaY * deltaY);
-            if (distancePlayer < 1000)
-            {
-              sprites[i].move = true;
-            }
+            sprites[i].move = true;
           }
+        }
 
-          for (int y = 0; y < loadedTextures[textureIndex].height; y++)
+        for (int y = 0; y < loadedTextures[textureIndex].height; y++)
+        {
+          Uint8 r, g, b, a;
+          getRGBFromTexture(textureIndex + 1, x, loadedTextures[textureIndex].height - 1 - y, r, g, b, a);
+
+          SDL_SetRenderDrawColor(renderer, r, g, b, 255);
+          if (a != 0)
           {
-            Uint8 r, g, b, a;
-            getRGBFromTexture(textureIndex + 1, x, loadedTextures[textureIndex].height - 1 - y, r, g, b, a);
-
-            SDL_SetRenderDrawColor(renderer, r, g, b, 255);
-            if (a != 0)
-            {
-              SDL_FRect rectangle;
-              rectangle.x = recX;
-              rectangle.y = projectedY - ((y * (256 * sprites[i].scaleY)) / distance);
-              rectangle.w = preCalculatedWidth;
-              rectangle.h = preCalculatedHeight;
-              SDL_RenderFillRectF(renderer, &rectangle);
-            }
+            SDL_FRect rectangle;
+            rectangle.x = recX;
+            rectangle.y = projectedY - ((y * (256 * sprites[i].scaleY)) / distance);
+            rectangle.w = preCalculatedWidth;
+            rectangle.h = preCalculatedHeight;
+            SDL_RenderFillRectF(renderer, &rectangle);
           }
         }
       }
@@ -736,7 +629,212 @@ void Game::drawSprites(SDL_Renderer *renderer, Player *player)
   }
 }
 
-void Game::shootBullet(const Player &player)
+int Game::getSpriteTextureIndex(SpriteType type)
+{
+  if (type == Bullet || type == EnemyBullet)
+    return 20;
+
+  if (type == Enemy || type == ShooterEnemy)
+    return 18;
+
+  if (type == Key)
+    return 21;
+
+  if (type == Coin)
+    return 22;
+
+  if (type == HammerEnemy)
+    return 23;
+
+  if (type == Spike)
+    return 24;
+
+  if (type == DroneEnemy)
+    return 25;
+
+  if (type == GoldBar)
+    return 26;
+
+  if (type == Bomb)
+    return 19;
+
+  std::cout << "Invalid sprite type when getting texture" << std::endl;
+  return -1;
+}
+
+void Game::handleEnemyBullet(int i)
+{
+  float bulletSpeed = 300;
+  float dx = bulletSpeed * cos(degToRad(sprites[i].direction.value())) * deltaTime;
+  float dy = bulletSpeed * sin(degToRad(sprites[i].direction.value())) * deltaTime;
+  sprites[i].x += dx;
+  sprites[i].y += dy;
+  float deltaX = player.pos.x - sprites[i].x;
+  float deltaY = player.pos.y - sprites[i].y;
+  float distance = std::sqrt(deltaX * deltaX + deltaY * deltaY);
+  if (distance < 10)
+  {
+    health -= 1;
+    sprites[i].active = false;
+  }
+
+  int cellIndexX = floor(sprites[i].x / cellWidth);
+  int cellIndexY = floor(sprites[i].y / cellWidth);
+
+  int mapCellIndex = getCell(cellIndexX, cellIndexY);
+
+  if (map[mapCellIndex] != 0)
+  {
+    sprites[i].active = false;
+  }
+}
+
+void Game::handleBullet(int i)
+{
+
+  float bulletSpeed = 300;
+  float dx = bulletSpeed * cos(degToRad(sprites[i].direction.value())) * deltaTime;
+  float dy = bulletSpeed * sin(degToRad(sprites[i].direction.value())) * deltaTime;
+  sprites[i].x += dx;
+  sprites[i].y += dy;
+  for (auto &sprite : sprites)
+  {
+
+    if ((sprite.type != Enemy && sprite.type != ShooterEnemy && sprite.type != HammerEnemy && sprite.type != DroneEnemy) || sprite.active == false)
+      continue;
+
+    float deltaX = sprite.x - sprites[i].x;
+    float deltaY = sprite.y - sprites[i].y;
+    float distance = std::sqrt(deltaX * deltaX + deltaY * deltaY);
+    if (distance < 10)
+    {
+      sprites[i].active = false;
+      sprite.health = sprite.health.value() - gunDamage;
+      break;
+    }
+  }
+
+  int cellIndexX = floor(sprites[i].x / cellWidth);
+  int cellIndexY = floor(sprites[i].y / cellWidth);
+
+  int mapCellIndex = getCell(cellIndexX, cellIndexY);
+
+  if (map[mapCellIndex] != 0)
+  {
+    sprites[i].active = false;
+  }
+}
+
+void Game::handleEnemyMovement(int i)
+{
+  if (!sprites[i].soundChannel.has_value())
+  {
+    sprites[i].soundChannel = Mix_PlayChannel(-1, sounds.at(3), 0);
+  }
+  if (!Mix_Playing(sprites[i].soundChannel.value()))
+  {
+    sprites[i].soundChannel = Mix_PlayChannel(-1, sounds.at(3), 0);
+  }
+  if (sprites[i].health <= 0)
+  {
+    if (sprites[i].type == Enemy)
+    {
+      levelMoney += 1;
+    }
+    else if (sprites[i].type == ShooterEnemy || sprites[i].type == HammerEnemy)
+    {
+      levelMoney += 2;
+    }
+    else if (sprites[i].type == DroneEnemy)
+    {
+      levelMoney += 1;
+    }
+    sprites[i].active = false;
+  }
+
+  float deltaX = player.pos.x - sprites[i].x;
+  float deltaY = player.pos.y - sprites[i].y;
+
+  float distance = std::sqrt(deltaX * deltaX + deltaY * deltaY);
+  if (distance < 10)
+  {
+    if (sprites[i].type == DroneEnemy)
+    {
+      sprites[i].active = false;
+      health -= 5;
+    }
+    else if (std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - sprites[i].enemyLastMeleeTime.value()).count() > enemyMeleeCooldown && sprites[i].type != HammerEnemy)
+    {
+      sprites[i].enemyLastMeleeTime = std::chrono::high_resolution_clock::now();
+      health -= 5;
+    }
+    else if (std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - sprites[i].enemyLastMeleeTime.value()).count() > hammerEnemyMeleeCooldown && sprites[i].type == HammerEnemy)
+    {
+      sprites[i].enemyLastMeleeTime = std::chrono::high_resolution_clock::now();
+      health -= 25;
+    }
+  }
+
+  if (distance > 0)
+  {
+    deltaX /= distance;
+    deltaY /= distance;
+
+    float enemySpeed = 35;
+    if (sprites[i].type == HammerEnemy)
+    {
+      enemySpeed = 20;
+    }
+    if (sprites[i].type == DroneEnemy)
+    {
+      enemySpeed = 120;
+    }
+    float newX = sprites[i].x + deltaX * enemySpeed * deltaTime;
+    float newY = sprites[i].y + deltaY * enemySpeed * deltaTime;
+
+    int cellIndexX = floor(newX / cellWidth);
+    int cellIndexY = floor(sprites[i].y / cellWidth);
+    int mapCellIndexX = getCell(cellIndexX, cellIndexY);
+
+    if (map[mapCellIndexX] == 0)
+    {
+      sprites[i].x = newX;
+    }
+
+    cellIndexX = floor(sprites[i].x / cellWidth);
+    cellIndexY = floor(newY / cellWidth);
+    int mapCellIndexY = getCell(cellIndexX, cellIndexY);
+
+    if (map[mapCellIndexY] == 0)
+    {
+      sprites[i].y = newY;
+    }
+  }
+}
+
+void Game::handleShooterEnemy(int i)
+{
+  sprites[i].enemyLastBulletTime = std::chrono::high_resolution_clock::now();
+
+  float deltaX = player.pos.x - sprites[i].x;
+  float deltaY = player.pos.y - sprites[i].y;
+
+  float angle = atan2(deltaY, deltaX) * (180 / M_PI);
+
+  Sprite bullet;
+  bullet.active = true;
+  bullet.type = EnemyBullet;
+  bullet.x = sprites[i].x;
+  bullet.y = sprites[i].y;
+  bullet.scaleX = 0.5;
+  bullet.scaleY = 0.5;
+  bullet.z = 7;
+  bullet.direction = angle;
+  sprites.emplace_back(bullet);
+  Mix_PlayChannel(-1, sounds.at(1), 0);
+}
+
+void Game::shootBullet()
 {
   if (gunType == Pistol && std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - lastBulletTime).count() > pistolShootingCooldown && spacePressed == false)
   {
@@ -814,14 +912,12 @@ void Game::shootBullet(const Player &player)
   }
 }
 
-void Game::handleInput(Player *player)
+void Game::handleInput()
 {
-  SDL_PumpEvents();
   const Uint8 *keystate = SDL_GetKeyboardState(NULL);
-
   if (keystate[SDL_SCANCODE_SPACE])
   {
-    shootBullet(*player);
+    shootBullet();
   }
   else
   {
@@ -848,64 +944,66 @@ void Game::handleInput(Player *player)
   {
     rotateSpeed = rotateSpeedFast;
   }
+
   if (keystate[SDL_SCANCODE_W])
   {
-    int cellIndexX = floor(((player->pos.x + (moveSpeed * cos(degToRad(player->angle)) * deltaTime)) * 1.0) / cellWidth);
-    int cellIndexY = floor(((player->pos.y + (moveSpeed * sin(degToRad(player->angle)) * deltaTime)) * 1.0) / cellWidth);
+    int cellIndexX = floor(((player.pos.x + (moveSpeed * cos(degToRad(player.angle)) * deltaTime)) * 1.0) / cellWidth);
+    int cellIndexY = floor(((player.pos.y + (moveSpeed * sin(degToRad(player.angle)) * deltaTime)) * 1.0) / cellWidth);
 
     int mapCellIndex = getCell(cellIndexX, cellIndexY);
 
     if (map[mapCellIndex] == 0)
     {
-      player->pos.x += moveSpeed * cos(degToRad(player->angle)) * deltaTime;
-      player->pos.y += moveSpeed * sin(degToRad(player->angle)) * deltaTime;
+      player.pos.x += moveSpeed * cos(degToRad(player.angle)) * deltaTime;
+      player.pos.y += moveSpeed * sin(degToRad(player.angle)) * deltaTime;
     }
   }
+
   if (keystate[SDL_SCANCODE_S])
   {
-    int cellIndexX = floor(((player->pos.x - (moveSpeed * cos(degToRad(player->angle)) * 1.1 * deltaTime))) / cellWidth);
-    int cellIndexY = floor(((player->pos.y - (moveSpeed * sin(degToRad(player->angle)) * 1.1 * deltaTime))) / cellWidth);
+    int cellIndexX = floor(((player.pos.x - (moveSpeed * cos(degToRad(player.angle)) * 1.1 * deltaTime))) / cellWidth);
+    int cellIndexY = floor(((player.pos.y - (moveSpeed * sin(degToRad(player.angle)) * 1.1 * deltaTime))) / cellWidth);
     int mapCellIndex = getCell(cellIndexX, cellIndexY);
 
     if (map[mapCellIndex] == 0)
     {
-      player->pos.x -= moveSpeed * cos(degToRad(player->angle)) * deltaTime;
-      player->pos.y -= moveSpeed * sin(degToRad(player->angle)) * deltaTime;
+      player.pos.x -= moveSpeed * cos(degToRad(player.angle)) * deltaTime;
+      player.pos.y -= moveSpeed * sin(degToRad(player.angle)) * deltaTime;
     }
   }
 
   if (keystate[SDL_SCANCODE_A])
   {
-    player->angle -= rotateSpeed * deltaTime;
+    player.angle -= rotateSpeed * deltaTime;
   }
   if (keystate[SDL_SCANCODE_D])
   {
-    player->angle += rotateSpeed * deltaTime;
+    player.angle += rotateSpeed * deltaTime;
   }
 
   if (keystate[SDL_SCANCODE_LEFT] || keystate[SDL_SCANCODE_Q])
   {
-    int cellIndexX = floor(((player->pos.x + ((moveSpeed / 1.4) * cos(degToRad(player->angle - 90)) * deltaTime)) * 1.0) / cellWidth);
-    int cellIndexY = floor(((player->pos.y + ((moveSpeed / 1.4) * sin(degToRad(player->angle - 90)) * deltaTime)) * 1.0) / cellWidth);
+    int cellIndexX = floor(((player.pos.x + ((moveSpeed / 1.4) * cos(degToRad(player.angle - 90)) * deltaTime)) * 1.0) / cellWidth);
+    int cellIndexY = floor(((player.pos.y + ((moveSpeed / 1.4) * sin(degToRad(player.angle - 90)) * deltaTime)) * 1.0) / cellWidth);
 
     int mapCellIndex = getCell(cellIndexX, cellIndexY);
 
     if (map[mapCellIndex] == 0)
     {
-      player->pos.x += (moveSpeed / 1.5) * cos(degToRad(player->angle - 90)) * deltaTime;
-      player->pos.y += (moveSpeed / 1.5) * sin(degToRad(player->angle - 90)) * deltaTime;
+      player.pos.x += (moveSpeed / 1.5) * cos(degToRad(player.angle - 90)) * deltaTime;
+      player.pos.y += (moveSpeed / 1.5) * sin(degToRad(player.angle - 90)) * deltaTime;
     }
   }
   if (keystate[SDL_SCANCODE_RIGHT] || keystate[SDL_SCANCODE_E])
   {
-    int cellIndexX = floor(((player->pos.x - ((moveSpeed / 1.4) * cos(degToRad(player->angle - 90)) * 1.1 * deltaTime))) / cellWidth);
-    int cellIndexY = floor(((player->pos.y - ((moveSpeed / 1.4) * sin(degToRad(player->angle - 90)) * 1.1 * deltaTime))) / cellWidth);
+    int cellIndexX = floor(((player.pos.x - ((moveSpeed / 1.4) * cos(degToRad(player.angle - 90)) * 1.1 * deltaTime))) / cellWidth);
+    int cellIndexY = floor(((player.pos.y - ((moveSpeed / 1.4) * sin(degToRad(player.angle - 90)) * 1.1 * deltaTime))) / cellWidth);
     int mapCellIndex = getCell(cellIndexX, cellIndexY);
 
     if (map[mapCellIndex] == 0)
     {
-      player->pos.x -= (moveSpeed / 1.5) * cos(degToRad(player->angle - 90)) * deltaTime;
-      player->pos.y -= (moveSpeed / 1.5) * sin(degToRad(player->angle - 90)) * deltaTime;
+      player.pos.x -= (moveSpeed / 1.5) * cos(degToRad(player.angle - 90)) * deltaTime;
+      player.pos.y -= (moveSpeed / 1.5) * sin(degToRad(player.angle - 90)) * deltaTime;
     }
   }
 
@@ -922,14 +1020,14 @@ void Game::handleInput(Player *player)
   if (keystate[SDL_SCANCODE_3] && playerData.minigunUnlocked)
   {
     gunType = Minigun;
-    gunDamage = 2 + playerData.minigunUpgraded;
+    gunDamage = 1 + playerData.minigunUpgraded;
   }
 
   if (keystate[SDL_SCANCODE_F])
   {
 
-    int cellIndexX = floor(((player->pos.x + (moveSpeed * cos(degToRad(player->angle)) * 4 * deltaTime))) / cellWidth);
-    int cellIndexY = floor(((player->pos.y + (moveSpeed * sin(degToRad(player->angle)) * 4 * deltaTime))) / cellWidth);
+    int cellIndexX = floor(((player.pos.x + (moveSpeed * cos(degToRad(player.angle)) * 4 * deltaTime))) / cellWidth);
+    int cellIndexY = floor(((player.pos.y + (moveSpeed * sin(degToRad(player.angle)) * 4 * deltaTime))) / cellWidth);
 
     int mapCellIndex = getCell(cellIndexX, cellIndexY);
 
@@ -956,14 +1054,19 @@ void Game::handleInput(Player *player)
   }
 }
 
-void Game::displayMainMenu(SDL_Renderer *renderer, Player *player, TTF_Font *font,
+void Game::displayMainMenu(SDL_Renderer *renderer, TTF_Font *font,
                            SDL_Texture *background, SDL_Texture *titleText, SDL_Rect titleRect)
 {
-  Button level1(renderer, 57, 300, 150, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "Level 1", font, 5, {0, 0, 0, 255});
-  Button level2(renderer, 247, 300, 150, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "Level 2", font, 5, {0, 0, 0, 255});
-  Button level3(renderer, 437, 300, 150, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "Level 3", font, 5, {0, 0, 0, 255});
-  Button level4(renderer, 627, 300, 150, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "Level 4", font, 5, {0, 0, 0, 255});
-  Button level5(renderer, 817, 300, 150, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "Coming Soon", font, 5, {0, 0, 0, 255});
+  Button level1(renderer, 57, 200, 150, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "Level 1", font, 5, {0, 0, 0, 255});
+  Button level2(renderer, 247, 200, 150, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "Level 2", font, 5, {0, 0, 0, 255});
+  Button level3(renderer, 437, 200, 150, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "Level 3", font, 5, {0, 0, 0, 255});
+  Button level4(renderer, 627, 200, 150, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "Level 4", font, 5, {0, 0, 0, 255});
+  Button level5(renderer, 817, 200, 150, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "level 5", font, 5, {0, 0, 0, 255});
+  Button level6(renderer, 57, 300, 150, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "Level 6", font, 5, {0, 0, 0, 255});
+  Button level7(renderer, 247, 300, 150, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "Level 7", font, 5, {0, 0, 0, 255});
+  Button level8(renderer, 437, 300, 150, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "Level 8", font, 5, {0, 0, 0, 255});
+  Button level9(renderer, 627, 300, 150, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "Level 9", font, 5, {0, 0, 0, 255});
+  Button level10(renderer, 817, 300, 150, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "level 10", font, 5, {0, 0, 0, 255});
   Button shop(renderer, 387, 400, 250, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "Shop", font, 5, {0, 0, 0, 255});
   SDL_Event event;
   while (SDL_PollEvent(&event))
@@ -976,7 +1079,7 @@ void Game::displayMainMenu(SDL_Renderer *renderer, Player *player, TTF_Font *fon
       mapFloors.clear();
       deserialize("map.dat");
       deserializeSprites("sprites.dat");
-      player = new Player({{80.0f, 80.0f}, 0.0f, 60});
+      player = {{80.0f, 80.0f}, 0.0f, 60};
       levelMoney = 0;
       health = 100;
       bombCount = 0;
@@ -991,7 +1094,7 @@ void Game::displayMainMenu(SDL_Renderer *renderer, Player *player, TTF_Font *fon
       mapFloors.clear();
       deserialize("map2.dat");
       deserializeSprites("sprites2.dat");
-      player = new Player({{80.0f, 80.0f}, 0.0f, 60});
+      player = {{80.0f, 80.0f}, 0.0f, 60};
       levelMoney = 0;
       health = 100;
       bombCount = 0;
@@ -1006,7 +1109,7 @@ void Game::displayMainMenu(SDL_Renderer *renderer, Player *player, TTF_Font *fon
       mapFloors.clear();
       deserialize("map3.dat");
       deserializeSprites("sprites3.dat");
-      player = new Player({{80.0f, 80.0f}, 0.0f, 60});
+      player = {{80.0f, 80.0f}, 0.0f, 60};
       levelMoney = 0;
       health = 100;
       bombCount = 0;
@@ -1021,9 +1124,102 @@ void Game::displayMainMenu(SDL_Renderer *renderer, Player *player, TTF_Font *fon
       mapFloors.clear();
       deserialize("map4.dat");
       deserializeSprites("sprites4.dat");
-      player = new Player({{80.0f, 80.0f}, 0.0f, 60});
+      player = {{80.0f, 80.0f}, 0.0f, 60};
       levelMoney = 0;
+      health = 100;
+      bombCount = 0;
+      keyCount = 0;
       level = 4;
+    }
+    if (level5.handleEvent(event))
+    {
+      sprites.clear();
+      map.clear();
+      mapCeiling.clear();
+      mapFloors.clear();
+      deserialize("map5.dat");
+      deserializeSprites("sprites5.dat");
+      player = {{80.0f, 80.0f}, 0.0f, 60};
+      levelMoney = 0;
+      health = 100;
+      bombCount = 0;
+      keyCount = 0;
+      level = 5;
+    }
+    if (level6.handleEvent(event))
+    {
+      sprites.clear();
+      map.clear();
+      mapCeiling.clear();
+      mapFloors.clear();
+      deserialize("map6.dat");
+      deserializeSprites("sprites6.dat");
+      player = {{80.0f, 80.0f}, 0.0f, 60};
+      levelMoney = 0;
+      health = 100;
+      bombCount = 0;
+      keyCount = 0;
+      level = 6;
+    }
+    if (level7.handleEvent(event))
+    {
+      sprites.clear();
+      map.clear();
+      mapCeiling.clear();
+      mapFloors.clear();
+      deserialize("map7.dat");
+      deserializeSprites("sprites7.dat");
+      player = {{80.0f, 80.0f}, 0.0f, 60};
+      levelMoney = 0;
+      health = 100;
+      bombCount = 0;
+      keyCount = 0;
+      level = 7;
+    }
+    if (level8.handleEvent(event))
+    {
+      sprites.clear();
+      map.clear();
+      mapCeiling.clear();
+      mapFloors.clear();
+      deserialize("map8.dat");
+      deserializeSprites("sprites8.dat");
+      player = {{80.0f, 80.0f}, 0.0f, 60};
+      levelMoney = 0;
+      health = 100;
+      bombCount = 0;
+      keyCount = 0;
+      level = 8;
+    }
+    if (level9.handleEvent(event))
+    {
+      sprites.clear();
+      map.clear();
+      mapCeiling.clear();
+      mapFloors.clear();
+      deserialize("map9.dat");
+      deserializeSprites("sprites9.dat");
+      player = {{80.0f, 80.0f}, 0.0f, 60};
+      levelMoney = 0;
+      health = 100;
+      bombCount = 0;
+      keyCount = 0;
+      level = 9;
+    }
+    if (level10.handleEvent(event))
+    {
+      sprites.clear();
+      map.clear();
+      mapCeiling.clear();
+      mapFloors.clear();
+      deserialize("map10.dat");
+      deserializeSprites("sprites10.dat");
+      player = {{80.0f, 80.0f}, 0.0f, 60};
+      levelMoney = 0;
+      health = 100;
+      bombCount = 0;
+      keyCount = 0;
+      level = 10;
     }
     if (shop.handleEvent(event))
     {
@@ -1042,6 +1238,11 @@ void Game::displayMainMenu(SDL_Renderer *renderer, Player *player, TTF_Font *fon
   level3.render();
   level4.render();
   level5.render();
+  level6.render();
+  level7.render();
+  level8.render();
+  level9.render();
+  level10.render();
   shop.render();
 
   SDL_RenderCopy(renderer, titleText, NULL, &titleRect);
@@ -1117,7 +1318,7 @@ void Game::displayShop(SDL_Renderer *renderer, TTF_Font *font, SDL_Texture *pist
         if (playerData.money >= 1000 && playerData.minigunUpgraded == false)
         {
           playerData.minigunUpgraded = true;
-          minigunShootingCooldown -= 25;
+          minigunShootingCooldown -= 5;
           playerData.money -= 1000;
         }
       }

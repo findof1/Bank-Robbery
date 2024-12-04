@@ -32,11 +32,19 @@ private:
   SDL_Window *initWindow();
   SDL_Renderer *initRenderer(SDL_Window *window);
   void initIcon(SDL_Window *window);
-  void raycast(Player *player, SDL_Renderer *renderer);
-  void drawSprites(SDL_Renderer *renderer, Player *player);
-  void shootBullet(const Player &player);
-  void handleInput(Player *player);
-  void displayMainMenu(SDL_Renderer *renderer, Player *player, TTF_Font *font,
+  void raycast(SDL_Renderer *renderer);
+
+  void handleSprites(SDL_Renderer *renderer);
+  int getSpriteTextureIndex(SpriteType type);
+  void handleEnemyBullet(int i);
+  void handleBullet(int i);
+  void handleEnemyMovement(int i);
+  void handleShooterEnemy(int i);
+  void renderSprite(int i);
+
+  void shootBullet();
+  void handleInput();
+  void displayMainMenu(SDL_Renderer *renderer, TTF_Font *font,
                        SDL_Texture *background, SDL_Texture *titleText, SDL_Rect titleRect);
   void displayShop(SDL_Renderer *renderer, TTF_Font *font, SDL_Texture *pistol, SDL_Texture *shotgun,
                    SDL_Texture *minigun, SDL_Color coinTextColor);

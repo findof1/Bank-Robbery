@@ -48,7 +48,11 @@ enum SpriteType
   ShooterEnemy,
   Bullet,
   EnemyBullet,
-  Coin
+  Coin,
+  HammerEnemy,
+  Spike,
+  DroneEnemy,
+  GoldBar
 };
 
 struct Sprite

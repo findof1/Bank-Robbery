@@ -24,11 +24,16 @@ std::vector<std::string> textureFilepaths = {
     "./textures/metalPlate.png",
     "./textures/marble.png",
     "./textures/exit.png",
+    "./textures/spikeTrap.png",
     "./textures/enemy.png",
     "./textures/bomb.png",
     "./textures/bullet.png",
     "./textures/key.png",
     "./textures/coin.png",
+    "./textures/hammerEnemy.png",
+    "./textures/spike.png",
+    "./textures/drone.png",
+    "./textures/goldBar.png",
 };
 
 const float moveSpeed = 100.f;
@@ -58,6 +63,9 @@ int level = 0;
 int bombCount = 0;
 int keyCount = 0;
 int enemyShootingCooldown = 500;
+int enemyMeleeCooldown = 1000;
+int hammerEnemyMeleeCooldown = 2000;
+int spikeTrapInterval = 2500;
 int pistolShootingCooldown = 500;
 int shotgunShootingCooldown = 1000;
 int minigunShootingCooldown = 75;
