@@ -43,6 +43,8 @@ Game::Game()
   SDL_FreeSurface(titleTextSurface);
 
   player = {{80.0f, 80.0f}, 0.0f, 60};
+
+  deserializePlayer("save.dat");
 }
 
 void Game::run()
@@ -154,6 +156,8 @@ void Game::run()
 
     SDL_Delay(16);
   }
+  serializePlayer("save.dat");
+
   for (auto sound : sounds)
   {
     Mix_FreeChunk(sound);
@@ -1050,6 +1054,7 @@ void Game::handleInput()
     {
       level = 0;
       playerData.money += levelMoney;
+      serializePlayer("save.dat");
     }
   }
 }
@@ -1085,6 +1090,7 @@ void Game::displayMainMenu(SDL_Renderer *renderer, TTF_Font *font,
       bombCount = 0;
       keyCount = 0;
       level = 1;
+      serializePlayer("save.dat");
     }
     if (level2.handleEvent(event))
     {
@@ -1100,6 +1106,7 @@ void Game::displayMainMenu(SDL_Renderer *renderer, TTF_Font *font,
       bombCount = 0;
       keyCount = 0;
       level = 2;
+      serializePlayer("save.dat");
     }
     if (level3.handleEvent(event))
     {
@@ -1115,6 +1122,7 @@ void Game::displayMainMenu(SDL_Renderer *renderer, TTF_Font *font,
       bombCount = 0;
       keyCount = 0;
       level = 3;
+      serializePlayer("save.dat");
     }
     if (level4.handleEvent(event))
     {
@@ -1130,6 +1138,7 @@ void Game::displayMainMenu(SDL_Renderer *renderer, TTF_Font *font,
       bombCount = 0;
       keyCount = 0;
       level = 4;
+      serializePlayer("save.dat");
     }
     if (level5.handleEvent(event))
     {
@@ -1145,6 +1154,7 @@ void Game::displayMainMenu(SDL_Renderer *renderer, TTF_Font *font,
       bombCount = 0;
       keyCount = 0;
       level = 5;
+      serializePlayer("save.dat");
     }
     if (level6.handleEvent(event))
     {
@@ -1160,6 +1170,7 @@ void Game::displayMainMenu(SDL_Renderer *renderer, TTF_Font *font,
       bombCount = 0;
       keyCount = 0;
       level = 6;
+      serializePlayer("save.dat");
     }
     if (level7.handleEvent(event))
     {
@@ -1175,6 +1186,7 @@ void Game::displayMainMenu(SDL_Renderer *renderer, TTF_Font *font,
       bombCount = 0;
       keyCount = 0;
       level = 7;
+      serializePlayer("save.dat");
     }
     if (level8.handleEvent(event))
     {
@@ -1190,6 +1202,7 @@ void Game::displayMainMenu(SDL_Renderer *renderer, TTF_Font *font,
       bombCount = 0;
       keyCount = 0;
       level = 8;
+      serializePlayer("save.dat");
     }
     if (level9.handleEvent(event))
     {
@@ -1205,6 +1218,7 @@ void Game::displayMainMenu(SDL_Renderer *renderer, TTF_Font *font,
       bombCount = 0;
       keyCount = 0;
       level = 9;
+      serializePlayer("save.dat");
     }
     if (level10.handleEvent(event))
     {
@@ -1220,6 +1234,7 @@ void Game::displayMainMenu(SDL_Renderer *renderer, TTF_Font *font,
       bombCount = 0;
       keyCount = 0;
       level = 10;
+      serializePlayer("save.dat");
     }
     if (shop.handleEvent(event))
     {
@@ -1281,6 +1296,7 @@ void Game::displayShop(SDL_Renderer *renderer, TTF_Font *font, SDL_Texture *pist
         playerData.pistolUpgraded = true;
         pistolShootingCooldown -= 100;
         playerData.money -= 100;
+        serializePlayer("save.dat");
       }
     }
     if (shotgunBtn.handleEvent(event))
@@ -1291,6 +1307,7 @@ void Game::displayShop(SDL_Renderer *renderer, TTF_Font *font, SDL_Texture *pist
         {
           playerData.shotgunUnlocked = true;
           playerData.money -= 250;
+          serializePlayer("save.dat");
         }
       }
       else
@@ -1299,6 +1316,7 @@ void Game::displayShop(SDL_Renderer *renderer, TTF_Font *font, SDL_Texture *pist
         {
           playerData.shotgunUpgraded = true;
           playerData.money -= 500;
+          serializePlayer("save.dat");
         }
       }
     }
@@ -1311,6 +1329,7 @@ void Game::displayShop(SDL_Renderer *renderer, TTF_Font *font, SDL_Texture *pist
         {
           playerData.minigunUnlocked = true;
           playerData.money -= 500;
+          serializePlayer("save.dat");
         }
       }
       else
@@ -1320,6 +1339,7 @@ void Game::displayShop(SDL_Renderer *renderer, TTF_Font *font, SDL_Texture *pist
           playerData.minigunUpgraded = true;
           minigunShootingCooldown -= 5;
           playerData.money -= 1000;
+          serializePlayer("save.dat");
         }
       }
     }

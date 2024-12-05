@@ -92,6 +92,55 @@ void deserialize(const std::string &filename)
   }
 }
 
+void serializePlayer(const std::string &filename)
+{
+  std::ofstream file(filename, std::ios::binary | std::ios::out);
+  if (file)
+  {
+    int serializationVersion = 1;
+    file.write(reinterpret_cast<const char *>(&serializationVersion), sizeof(serializationVersion));
+    file.write(reinterpret_cast<const char *>(&playerData.money), sizeof(playerData.money));
+    file.write(reinterpret_cast<const char *>(&playerData.pistolUpgraded), sizeof(playerData.pistolUpgraded));
+    file.write(reinterpret_cast<const char *>(&playerData.shotgunUnlocked), sizeof(playerData.shotgunUnlocked));
+    file.write(reinterpret_cast<const char *>(&playerData.shotgunUpgraded), sizeof(playerData.shotgunUpgraded));
+    file.write(reinterpret_cast<const char *>(&playerData.minigunUnlocked), sizeof(playerData.minigunUnlocked));
+    file.write(reinterpret_cast<const char *>(&playerData.minigunUpgraded), sizeof(playerData.minigunUpgraded));
+
+    file.close();
+  }
+  else
+  {
+    std::cerr << "Error opening file for writing.\n";
+  }
+}
+
+void deserializePlayer(const std::string &filename)
+{
+  std::ifstream file(filename, std::ios::binary | std::ios::in);
+  if (file)
+  {
+    int serializationVersion; // purpose of this is so I can update serialization without wiping everyones progress
+    file.read(reinterpret_cast<char *>(&serializationVersion), sizeof(int));
+    if (serializationVersion == 1)
+    {
+      file.read(reinterpret_cast<char *>(&playerData.money), sizeof(int));
+      file.read(reinterpret_cast<char *>(&playerData.pistolUpgraded), sizeof(bool));
+      if (playerData.pistolUpgraded)
+      {
+        pistolShootingCooldown -= 100;
+      }
+      file.read(reinterpret_cast<char *>(&playerData.shotgunUnlocked), sizeof(bool));
+      file.read(reinterpret_cast<char *>(&playerData.shotgunUpgraded), sizeof(bool));
+      file.read(reinterpret_cast<char *>(&playerData.minigunUnlocked), sizeof(bool));
+      file.read(reinterpret_cast<char *>(&playerData.minigunUpgraded), sizeof(bool));
+      if (playerData.minigunUpgraded)
+      {
+        minigunShootingCooldown -= 5;
+      }
+    }
+  }
+}
+
 void deserializeSprites(const std::string &filename)
 {
   std::ifstream file(filename, std::ios::binary | std::ios::in);
