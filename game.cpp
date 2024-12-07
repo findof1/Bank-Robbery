@@ -45,6 +45,8 @@ Game::Game()
   player = {{80.0f, 80.0f}, 0.0f, 60};
 
   deserializePlayer("save.dat");
+
+  Achievements::update();
 }
 
 void Game::run()
@@ -77,6 +79,11 @@ void Game::run()
     else if (level == -1)
     {
       displayShop(renderer, font, pistol, shotgun, minigun, coinTextColor);
+      continue;
+    }
+    else if (level == -2)
+    {
+      displayAchievements(renderer, font);
       continue;
     }
     if (health <= 0)
@@ -1322,6 +1329,10 @@ void Game::handleInput()
     }
     if (map[mapCellIndex] == 17)
     {
+      if (level > playerData.highestLevelBeaten)
+      {
+        playerData.highestLevelBeaten = level;
+      }
       level = 0;
       playerData.money += levelMoney;
       serializePlayer("save.dat");
@@ -1346,7 +1357,6 @@ void Game::handleInput()
           deserializeSprites("sprites11.dat");
           player = {{80.0f, 80.0f}, 0.0f, 60};
           health = 100;
-          level = 11;
         }
       }
     }
@@ -1366,7 +1376,9 @@ void Game::displayMainMenu(SDL_Renderer *renderer, TTF_Font *font,
   Button level8(renderer, 437, 300, 150, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "Level 8", font, 5, {0, 0, 0, 255});
   Button level9(renderer, 627, 300, 150, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "Level 9", font, 5, {0, 0, 0, 255});
   Button level10(renderer, 817, 300, 150, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "level 10", font, 5, {0, 0, 0, 255});
-  Button shop(renderer, 387, 400, 250, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "Shop", font, 5, {0, 0, 0, 255});
+  Button shop(renderer, 387 + 250, 400, 250, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "Shop", font, 5, {0, 0, 0, 255});
+  Button achievements(renderer, 387 - 250, 400, 250, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "Achievements", font, 5, {0, 0, 0, 255});
+
   SDL_Event event;
   while (SDL_PollEvent(&event))
   {
@@ -1534,6 +1546,11 @@ void Game::displayMainMenu(SDL_Renderer *renderer, TTF_Font *font,
     {
       level = -1;
     }
+    if (achievements.handleEvent(event))
+    {
+      Achievements::update();
+      level = -2;
+    }
   }
   SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
   SDL_RenderClear(renderer);
@@ -1551,6 +1568,7 @@ void Game::displayMainMenu(SDL_Renderer *renderer, TTF_Font *font,
   level9.render();
   level10.render();
   shop.render();
+  achievements.render();
 
   SDL_RenderCopy(renderer, titleText, NULL, &titleRect);
 
@@ -1669,6 +1687,70 @@ void Game::displayShop(SDL_Renderer *renderer, TTF_Font *font, SDL_Texture *pist
   pistolBtn.render();
   shotgunBtn.render();
   minigunBtn.render();
+
+  SDL_RenderPresent(renderer);
+
+  SDL_Delay(16);
+}
+
+void Game::displayAchievements(SDL_Renderer *renderer, TTF_Font *font)
+{
+  Button back(renderer, 57, 400, 150, 75, {200, 200, 200, 255}, {210, 210, 210, 255}, "Back", font, 5, {0, 0, 0, 255});
+  Text beatenAllLevels(renderer, font, 50, 20, "Beat All Levels", 0.9);
+  SDL_Rect beatenAllLevelsRect = {20, 20, 20, 20};
+
+  Text gotAllWeaponsUpgraded(renderer, font, 50, 60, "Upgrade All Weapons", 0.9);
+  SDL_Rect gotAllWeaponsUpgradedRect = {20, 60, 20, 20};
+
+  Text hundretPercenter(renderer, font, 50, 100, "Earn All Achievements", 0.9);
+  SDL_Rect hundretPercenterRect = {20, 100, 20, 20};
+
+  SDL_Event event;
+  while (SDL_PollEvent(&event))
+  {
+    if (back.handleEvent(event))
+    {
+      level = 0;
+    }
+  }
+
+  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+  SDL_RenderClear(renderer);
+
+  back.render();
+
+  if (Achievements::beatenAllLevels == true)
+  {
+    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+  }
+  else
+  {
+    SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+  }
+  SDL_RenderFillRect(renderer, &beatenAllLevelsRect);
+  beatenAllLevels.render();
+
+  if (Achievements::gotAllWeaponsUpgraded == true)
+  {
+    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+  }
+  else
+  {
+    SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+  }
+  SDL_RenderFillRect(renderer, &gotAllWeaponsUpgradedRect);
+  gotAllWeaponsUpgraded.render();
+
+  if (Achievements::hundredPercenter == true)
+  {
+    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+  }
+  else
+  {
+    SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+  }
+  SDL_RenderFillRect(renderer, &hundretPercenterRect);
+  hundretPercenter.render();
 
   SDL_RenderPresent(renderer);
 

@@ -130,3 +130,26 @@ namespace BossValues
     bool door3 = false;
     bool door4 = false;
 }
+
+namespace Achievements
+{
+    bool beatenAllLevels = false;
+    bool gotAllWeaponsUpgraded = false;
+    bool hundredPercenter = false;
+
+    void update()
+    {
+        if (playerData.highestLevelBeaten == 10)
+        {
+            beatenAllLevels = true;
+        }
+        if (playerData.minigunUpgraded == true && playerData.pistolUpgraded == true && playerData.shotgunUpgraded == true)
+        {
+            gotAllWeaponsUpgraded = true;
+        }
+        if (beatenAllLevels == true && gotAllWeaponsUpgraded == true)
+        {
+            hundredPercenter = true;
+        }
+    }
+}

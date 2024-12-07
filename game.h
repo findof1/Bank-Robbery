@@ -49,4 +49,5 @@ private:
                        SDL_Texture *background, SDL_Texture *titleText, SDL_Rect titleRect);
   void displayShop(SDL_Renderer *renderer, TTF_Font *font, SDL_Texture *pistol, SDL_Texture *shotgun,
                    SDL_Texture *minigun, SDL_Color coinTextColor);
+  void displayAchievements(SDL_Renderer *renderer, TTF_Font *font);
 };

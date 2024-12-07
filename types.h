@@ -17,6 +17,7 @@ struct PlayerData
   bool shotgunUpgraded = false;
   bool minigunUnlocked = false;
   bool minigunUpgraded = false;
+  int highestLevelBeaten = 0;
   int money = 0;
 };
 
@@ -165,5 +166,37 @@ public:
     }
 
     return false;
+  }
+};
+
+class Text
+{
+public:
+  SDL_Renderer *renderer;
+  SDL_Texture *textTexture;
+  SDL_Rect textRect;
+  float textScale;
+
+  Text(SDL_Renderer *renderer, TTF_Font *font, int x, int y, std::string text, float textScale = 1) : renderer(renderer), textScale(textScale)
+  {
+    SDL_Surface *textSurface = TTF_RenderText_Solid(font, text.c_str(), {255, 255, 255, 255});
+    textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
+
+    textRect = {static_cast<int>(x),
+                static_cast<int>(y),
+                static_cast<int>(textSurface->w * textScale),
+                static_cast<int>(textSurface->h * textScale)};
+
+    SDL_FreeSurface(textSurface);
+  }
+
+  void render()
+  {
+    SDL_RenderCopy(renderer, textTexture, NULL, &textRect);
+  }
+
+  ~Text()
+  {
+    SDL_DestroyTexture(textTexture);
   }
 };

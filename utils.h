@@ -97,7 +97,7 @@ void serializePlayer(const std::string &filename)
   std::ofstream file(filename, std::ios::binary | std::ios::out);
   if (file)
   {
-    int serializationVersion = 1;
+    int serializationVersion = 2;
     file.write(reinterpret_cast<const char *>(&serializationVersion), sizeof(serializationVersion));
     file.write(reinterpret_cast<const char *>(&playerData.money), sizeof(playerData.money));
     file.write(reinterpret_cast<const char *>(&playerData.pistolUpgraded), sizeof(playerData.pistolUpgraded));
@@ -105,6 +105,7 @@ void serializePlayer(const std::string &filename)
     file.write(reinterpret_cast<const char *>(&playerData.shotgunUpgraded), sizeof(playerData.shotgunUpgraded));
     file.write(reinterpret_cast<const char *>(&playerData.minigunUnlocked), sizeof(playerData.minigunUnlocked));
     file.write(reinterpret_cast<const char *>(&playerData.minigunUpgraded), sizeof(playerData.minigunUpgraded));
+    file.write(reinterpret_cast<const char *>(&playerData.highestLevelBeaten), sizeof(playerData.highestLevelBeaten));
 
     file.close();
   }
@@ -137,6 +138,26 @@ void deserializePlayer(const std::string &filename)
       {
         minigunShootingCooldown -= 5;
       }
+      playerData.highestLevelBeaten = 0;
+    }
+    else if (serializationVersion == 2)
+    {
+      file.read(reinterpret_cast<char *>(&playerData.money), sizeof(int));
+      file.read(reinterpret_cast<char *>(&playerData.pistolUpgraded), sizeof(bool));
+      if (playerData.pistolUpgraded)
+      {
+        pistolShootingCooldown -= 100;
+      }
+      file.read(reinterpret_cast<char *>(&playerData.shotgunUnlocked), sizeof(bool));
+      file.read(reinterpret_cast<char *>(&playerData.shotgunUpgraded), sizeof(bool));
+      file.read(reinterpret_cast<char *>(&playerData.minigunUnlocked), sizeof(bool));
+      file.read(reinterpret_cast<char *>(&playerData.minigunUpgraded), sizeof(bool));
+      if (playerData.minigunUpgraded)
+      {
+        minigunShootingCooldown -= 5;
+      }
+
+      file.read(reinterpret_cast<char *>(&playerData.highestLevelBeaten), sizeof(int));
     }
   }
 }
