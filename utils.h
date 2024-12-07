@@ -154,7 +154,7 @@ void deserializeSprites(const std::string &filename)
       Sprite sprite;
       int type;
       file.read(reinterpret_cast<char *>(&type), sizeof(int));
-      if (type - 1 < 0 || type - 1 > static_cast<int>(SpriteType::GoldBar))
+      if (type - 1 < 0 || type - 1 > static_cast<int>(SpriteType::Swat))
       {
         invalid = true;
       }
@@ -163,7 +163,7 @@ void deserializeSprites(const std::string &filename)
       file.read(reinterpret_cast<char *>(&sprite.x), sizeof(float));
       file.read(reinterpret_cast<char *>(&sprite.y), sizeof(float));
       file.read(reinterpret_cast<char *>(&sprite.z), sizeof(float));
-      if (sprite.type == Enemy || sprite.type == ShooterEnemy || sprite.type == HammerEnemy)
+      if (sprite.type == Enemy || sprite.type == ShooterEnemy || sprite.type == HammerEnemy || sprite.type == Swat)
       {
         sprite.z = 20;
       }
@@ -216,6 +216,16 @@ void deserializeSprites(const std::string &filename)
         sprite.scaleY = 1.2;
         sprite.enemyLastMeleeTime = std::chrono::high_resolution_clock::now();
         sprite.move = false;
+      }
+
+      if (sprite.type == Swat)
+      {
+        sprite.scaleX = 1.6;
+        sprite.scaleY = 1.4;
+        sprite.enemyLastMeleeTime = std::chrono::high_resolution_clock::now();
+        sprite.enemyLastBulletTime = std::chrono::high_resolution_clock::now();
+        sprite.move = false;
+        sprite.health = BossValues::initialBossHealth;
       }
 
       if (hasHealth)
@@ -334,4 +344,40 @@ TTF_Font *loadFont(std::string filepath, int size = 24)
     exit(EXIT_FAILURE);
   }
   return font;
+}
+
+void renderHealthBar(SDL_Renderer *renderer, float healthPercentage, TTF_Font *font)
+{
+  if (healthPercentage < 0.0f)
+    healthPercentage = 0.0f;
+  if (healthPercentage > 1.0f)
+    healthPercentage = 1.0f;
+
+  SDL_Rect backgroundRect = {212, 50, 600, 30};
+  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+  SDL_RenderFillRect(renderer, &backgroundRect);
+
+  SDL_Rect healthRect = {212 + 2, 50 + 2, static_cast<int>((600 - 4) * healthPercentage), 30 - 4};
+  SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+  SDL_RenderFillRect(renderer, &healthRect);
+
+  SDL_Surface *textSurface = TTF_RenderText_Solid(font, "Commander Steel", {255, 255, 255, 255});
+  if (!textSurface)
+  {
+    std::cerr << "Failed to render text surface: " << TTF_GetError() << std::endl;
+    return;
+  }
+  SDL_Texture *textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
+  if (!textTexture)
+  {
+    std::cerr << "Failed to create text texture: " << SDL_GetError() << std::endl;
+    SDL_FreeSurface(textSurface);
+    return;
+  }
+
+  SDL_Rect textRect = {static_cast<int>((1024 - textSurface->w * 1.4) / 2), 10, static_cast<int>(textSurface->w * 1.4), static_cast<int>(textSurface->h * 1.4)};
+  SDL_RenderCopy(renderer, textTexture, nullptr, &textRect);
+
+  SDL_DestroyTexture(textTexture);
+  SDL_FreeSurface(textSurface);
 }

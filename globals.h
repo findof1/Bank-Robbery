@@ -1,6 +1,7 @@
 #pragma once
 #include "types.h"
 #include <vector>
+#include <random>
 std::vector<Texture> loadedTextures;
 float deltaTime;
 
@@ -25,6 +26,8 @@ std::vector<std::string> textureFilepaths = {
     "./textures/marble.png",
     "./textures/exit.png",
     "./textures/spikeTrap.png",
+    "./textures/stairs.png",
+    "./textures/safeDoorBoss.png",
     "./textures/enemy.png",
     "./textures/bomb.png",
     "./textures/bullet.png",
@@ -34,6 +37,7 @@ std::vector<std::string> textureFilepaths = {
     "./textures/spike.png",
     "./textures/drone.png",
     "./textures/goldBar.png",
+    "./textures/swat.png",
 };
 
 const float moveSpeed = 100.f;
@@ -83,3 +87,46 @@ int musicChannel = -1;
 
 std::chrono::_V2::system_clock::time_point currentTime = std::chrono::high_resolution_clock::now();
 std::chrono::_V2::system_clock::time_point lastTime = std::chrono::high_resolution_clock::now();
+
+namespace BossValues
+{
+    const int initialBossHealth = 1000;
+
+    int generateStrafingTime()
+    {
+        std::mt19937 gen(rd());
+
+        std::uniform_real_distribution<float> dist(0, 5000);
+
+        float randomNum = dist(gen);
+        return randomNum + 5000;
+    }
+
+    std::chrono::_V2::system_clock::time_point strafingTimer = std::chrono::high_resolution_clock::now();
+    int strafingTime = generateStrafingTime();
+    int strafeDir = 0;
+
+    int generateChargeTime()
+    {
+        std::mt19937 gen(rd());
+
+        std::uniform_real_distribution<float> dist(0, 2000);
+
+        float randomNum = dist(gen);
+        return randomNum + 5000;
+    }
+    std::chrono::_V2::system_clock::time_point chargeTimer = std::chrono::high_resolution_clock::now();
+    int chargeTime = generateChargeTime();
+    std::chrono::_V2::system_clock::time_point chargeDurationTimer = std::chrono::high_resolution_clock::now();
+    int chargeDuration = 150;
+
+    int shootingCooldown = 2000;
+
+    std::chrono::_V2::system_clock::time_point bigAttackTimer = std::chrono::high_resolution_clock::now();
+    int bigAttackTime = 10000;
+
+    bool door1 = false;
+    bool door2 = false;
+    bool door3 = false;
+    bool door4 = false;
+}

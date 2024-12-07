@@ -40,6 +40,7 @@ private:
   void handleBullet(int i);
   void handleEnemyMovement(int i);
   void handleShooterEnemy(int i);
+  void handleSwatBoss(int i);
   void renderSprite(int i);
 
   void shootBullet();

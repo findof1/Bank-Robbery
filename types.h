@@ -52,7 +52,8 @@ enum SpriteType
   HammerEnemy,
   Spike,
   DroneEnemy,
-  GoldBar
+  GoldBar,
+  Swat
 };
 
 struct Sprite

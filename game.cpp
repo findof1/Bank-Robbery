@@ -557,12 +557,22 @@ void Game::handleSprites(SDL_Renderer *renderer)
         continue;
     }
 
+    if (sprites[i].type == Swat && sprites[i].move == true)
+    {
+      handleSwatBoss(i);
+    }
+
     if (sprites[i].type == ShooterEnemy && std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - sprites[i].enemyLastBulletTime.value()).count() > enemyShootingCooldown && sprites[i].move == true)
     {
       handleShooterEnemy(i);
     }
 
     renderSprite(i);
+
+    if (sprites[i].type == Swat && sprites[i].move == true)
+    {
+      renderHealthBar(renderer, sprites[i].health.value() / BossValues::initialBossHealth, font);
+    }
   }
 }
 
@@ -600,16 +610,12 @@ void Game::renderSprite(int i)
       if (static_cast<int>(glm::clamp((recX * (player.FOV / rayStep)) / 1024, 0.f, (player.FOV / rayStep))) - 1 >= 0 && static_cast<int>(glm::clamp((recX * (player.FOV / rayStep)) / 1024, 0.f, (player.FOV / rayStep))) - 1 <= (player.FOV / rayStep) && distance < distances.at(static_cast<int>(glm::clamp((recX * (player.FOV / rayStep)) / 1024, 0.f, (player.FOV / rayStep))) - 1))
       {
 
-        if ((sprites[i].type == Enemy || sprites[i].type == ShooterEnemy || sprites[i].type == HammerEnemy || sprites[i].type == DroneEnemy) && sprites[i].move == false && recX < 1024)
+        if ((sprites[i].type == Enemy || sprites[i].type == ShooterEnemy || sprites[i].type == HammerEnemy || sprites[i].type == DroneEnemy || sprites[i].type == Swat) && sprites[i].move == false && recX < 1024)
         {
           float deltaX = player.pos.x - sprites[i].x;
           float deltaY = player.pos.y - sprites[i].y;
 
-          float distancePlayer = std::sqrt(deltaX * deltaX + deltaY * deltaY);
-          if (distancePlayer < 1000)
-          {
-            sprites[i].move = true;
-          }
+          sprites[i].move = true;
         }
 
         for (int y = 0; y < loadedTextures[textureIndex].height; y++)
@@ -635,35 +641,299 @@ void Game::renderSprite(int i)
 
 int Game::getSpriteTextureIndex(SpriteType type)
 {
-  if (type == Bullet || type == EnemyBullet)
-    return 20;
 
   if (type == Enemy || type == ShooterEnemy)
-    return 18;
-
-  if (type == Key)
-    return 21;
-
-  if (type == Coin)
-    return 22;
-
-  if (type == HammerEnemy)
-    return 23;
-
-  if (type == Spike)
-    return 24;
-
-  if (type == DroneEnemy)
-    return 25;
-
-  if (type == GoldBar)
-    return 26;
+    return 20;
 
   if (type == Bomb)
-    return 19;
+    return 21;
+
+  if (type == Bullet || type == EnemyBullet)
+    return 22;
+
+  if (type == Key)
+    return 23;
+
+  if (type == Coin)
+    return 24;
+
+  if (type == HammerEnemy)
+    return 25;
+
+  if (type == Spike)
+    return 26;
+
+  if (type == DroneEnemy)
+    return 27;
+
+  if (type == GoldBar)
+    return 28;
+
+  if (type == Swat)
+    return 29;
 
   std::cout << "Invalid sprite type when getting texture" << std::endl;
   return -1;
+}
+
+void Game::handleSwatBoss(int i)
+{
+  if (!sprites[i].soundChannel.has_value())
+  {
+    sprites[i].soundChannel = Mix_PlayChannel(-1, sounds.at(3), 0);
+  }
+  if (!Mix_Playing(sprites[i].soundChannel.value()))
+  {
+    sprites[i].soundChannel = Mix_PlayChannel(-1, sounds.at(3), 0);
+  }
+  if (sprites[i].health <= 0)
+  {
+    levelMoney += 100;
+    sprites[i].active = false;
+    for (auto &tile : map)
+    {
+      if (tile == 20)
+      {
+        tile = 0;
+      }
+    }
+  }
+
+  if (sprites[i].health.value() / BossValues::initialBossHealth < 0.8 && BossValues::door1 == false)
+  {
+    BossValues::door1 = true;
+    for (auto &tile : map)
+    {
+      if (tile == 7)
+      {
+        tile = 0;
+        break;
+      }
+    }
+  }
+
+  if (sprites[i].health.value() / BossValues::initialBossHealth < 0.6 && BossValues::door2 == false)
+  {
+    BossValues::door2 = true;
+    for (auto &tile : map)
+    {
+      if (tile == 7)
+      {
+        tile = 0;
+        break;
+      }
+    }
+  }
+
+  if (sprites[i].health.value() / BossValues::initialBossHealth < 0.4 && BossValues::door3 == false)
+  {
+    BossValues::door3 = true;
+    for (auto &tile : map)
+    {
+      if (tile == 7)
+      {
+        tile = 0;
+        break;
+      }
+    }
+  }
+
+  if (sprites[i].health.value() / BossValues::initialBossHealth < 0.2 && BossValues::door4 == false)
+  {
+    BossValues::door4 = true;
+    for (auto &tile : map)
+    {
+      if (tile == 7)
+      {
+        tile = 0;
+        break;
+      }
+    }
+  }
+
+  float deltaX = player.pos.x - sprites[i].x;
+  float deltaY = player.pos.y - sprites[i].y;
+
+  float distance = std::sqrt(deltaX * deltaX + deltaY * deltaY);
+  deltaX /= distance;
+  deltaY /= distance;
+
+  if (std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - BossValues::bigAttackTimer).count() > BossValues::bigAttackTime)
+  {
+    BossValues::bigAttackTimer = std::chrono::high_resolution_clock::now();
+    sprites[i].enemyLastBulletTime = std::chrono::high_resolution_clock::now();
+
+    float deltaX = player.pos.x - sprites[i].x;
+    float deltaY = player.pos.y - sprites[i].y;
+
+    float angle = atan2(deltaY, deltaX) * (180 / M_PI);
+
+    Sprite bullet;
+    bullet.active = true;
+    bullet.type = EnemyBullet;
+    bullet.x = sprites[i].x;
+    bullet.y = sprites[i].y;
+    bullet.scaleX = 0.75;
+    bullet.scaleY = 0.75;
+    bullet.z = 7;
+    bullet.direction = angle;
+    sprites.emplace_back(bullet);
+    for (int i = 0; i < 360; i += 8)
+    {
+      bullet.direction = angle + i;
+      sprites.emplace_back(bullet);
+    }
+    Mix_PlayChannel(-1, sounds.at(1), 0);
+  }
+
+  if (std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - sprites[i].enemyLastBulletTime.value()).count() > BossValues::shootingCooldown)
+  {
+    sprites[i].enemyLastBulletTime = std::chrono::high_resolution_clock::now();
+
+    std::mt19937 gen(rd());
+
+    std::uniform_int_distribution<int> dist(0, 1);
+
+    float randomNumber = dist(gen);
+
+    float deltaX = player.pos.x - sprites[i].x;
+    float deltaY = player.pos.y - sprites[i].y;
+
+    float angle = atan2(deltaY, deltaX) * (180 / M_PI);
+
+    Sprite bullet;
+    bullet.active = true;
+    bullet.type = EnemyBullet;
+    bullet.x = sprites[i].x;
+    bullet.y = sprites[i].y;
+    bullet.scaleX = 0.75;
+    bullet.scaleY = 0.75;
+    bullet.z = 7;
+    if (randomNumber == 0)
+    {
+      bullet.direction = angle;
+      sprites.emplace_back(bullet);
+
+      bullet.direction = angle + 10;
+      sprites.emplace_back(bullet);
+
+      bullet.direction = angle - 10;
+      sprites.emplace_back(bullet);
+
+      bullet.direction = angle + 20;
+      sprites.emplace_back(bullet);
+
+      bullet.direction = angle - 20;
+      sprites.emplace_back(bullet);
+    }
+    else
+    {
+
+      bullet.direction = angle + 5;
+      sprites.emplace_back(bullet);
+
+      bullet.direction = angle - 5;
+      sprites.emplace_back(bullet);
+
+      bullet.direction = angle + 15;
+      sprites.emplace_back(bullet);
+
+      bullet.direction = angle - 15;
+      sprites.emplace_back(bullet);
+
+      bullet.direction = angle + 25;
+      sprites.emplace_back(bullet);
+
+      bullet.direction = angle - 25;
+      sprites.emplace_back(bullet);
+    }
+    Mix_PlayChannel(-1, sounds.at(1), 0);
+  }
+
+  if (std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - BossValues::strafingTimer).count() > BossValues::strafingTime)
+  {
+    BossValues::strafeDir = BossValues::strafeDir == 0 ? 1 : 0;
+    BossValues::strafingTimer = std::chrono::high_resolution_clock::now();
+    BossValues::strafingTime = BossValues::generateStrafingTime();
+  }
+
+  if (std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - BossValues::chargeTimer).count() > BossValues::chargeTime)
+  {
+    BossValues::chargeDurationTimer = std::chrono::high_resolution_clock::now();
+    BossValues::chargeTimer = std::chrono::high_resolution_clock::now();
+    BossValues::chargeTime = BossValues::generateChargeTime();
+  }
+
+  if (std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - BossValues::chargeDurationTimer).count() < BossValues::chargeDuration)
+  {
+    if (distance < 15 && std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - sprites[i].enemyLastMeleeTime.value()).count() > enemyMeleeCooldown)
+    {
+      sprites[i].enemyLastMeleeTime = std::chrono::high_resolution_clock::now();
+      health -= 25;
+    }
+
+    float chargeSpeed = 750;
+    float newX = sprites[i].x + deltaX * chargeSpeed * deltaTime;
+    float newY = sprites[i].y + deltaY * chargeSpeed * deltaTime;
+
+    int cellIndexX = floor(newX / cellWidth);
+    int cellIndexY = floor(sprites[i].y / cellWidth);
+    int mapCellIndexX = getCell(cellIndexX, cellIndexY);
+
+    if (map[mapCellIndexX] == 0)
+    {
+      sprites[i].x = newX;
+    }
+
+    cellIndexX = floor(sprites[i].x / cellWidth);
+    cellIndexY = floor(newY / cellWidth);
+    int mapCellIndexY = getCell(cellIndexX, cellIndexY);
+
+    if (map[mapCellIndexY] == 0)
+    {
+      sprites[i].y = newY;
+    }
+  }
+
+  float enemySpeed = 40;
+  float newX;
+  float newY;
+  if (BossValues::strafeDir == 0)
+  {
+    newX = sprites[i].x - deltaY * enemySpeed * deltaTime;
+    newY = sprites[i].y + deltaX * enemySpeed * deltaTime;
+  }
+  else
+  {
+    newX = sprites[i].x + deltaY * enemySpeed * deltaTime;
+    newY = sprites[i].y - deltaX * enemySpeed * deltaTime;
+  }
+
+  int cellIndexX = floor(newX / cellWidth);
+  int cellIndexY = floor(sprites[i].y / cellWidth);
+  int mapCellIndexX = getCell(cellIndexX, cellIndexY);
+
+  if (map[mapCellIndexX] == 0)
+  {
+    sprites[i].x = newX;
+  }
+  else if (BossValues::chargeTime > 100)
+  {
+    BossValues::chargeTime = 100;
+  }
+
+  cellIndexX = floor(sprites[i].x / cellWidth);
+  cellIndexY = floor(newY / cellWidth);
+  int mapCellIndexY = getCell(cellIndexX, cellIndexY);
+
+  if (map[mapCellIndexY] == 0)
+  {
+    sprites[i].y = newY;
+  }
+  else if (BossValues::chargeTime > 100)
+  {
+    BossValues::chargeTime = 100;
+  }
 }
 
 void Game::handleEnemyBullet(int i)
@@ -704,7 +974,7 @@ void Game::handleBullet(int i)
   for (auto &sprite : sprites)
   {
 
-    if ((sprite.type != Enemy && sprite.type != ShooterEnemy && sprite.type != HammerEnemy && sprite.type != DroneEnemy) || sprite.active == false)
+    if ((sprite.type != Enemy && sprite.type != ShooterEnemy && sprite.type != HammerEnemy && sprite.type != DroneEnemy && sprite.type != Swat) || sprite.active == false)
       continue;
 
     float deltaX = sprite.x - sprites[i].x;
@@ -1057,6 +1327,30 @@ void Game::handleInput()
       serializePlayer("save.dat");
     }
   }
+
+  for (int x = 0; x < mapX; x++)
+  {
+    for (int y = 0; y < mapY; y++)
+    {
+      if (mapFloors[getCell(x, y)] == 19)
+      {
+        int playerCellIndexX = floor(player.pos.x / cellWidth);
+        int playerCellIndexY = floor(player.pos.y / cellWidth);
+        if (x == playerCellIndexX && y == playerCellIndexY)
+        {
+          sprites.clear();
+          map.clear();
+          mapCeiling.clear();
+          mapFloors.clear();
+          deserialize("map11.dat");
+          deserializeSprites("sprites11.dat");
+          player = {{80.0f, 80.0f}, 0.0f, 60};
+          health = 100;
+          level = 11;
+        }
+      }
+    }
+  }
 }
 
 void Game::displayMainMenu(SDL_Renderer *renderer, TTF_Font *font,
@@ -1238,8 +1532,6 @@ void Game::displayMainMenu(SDL_Renderer *renderer, TTF_Font *font,
     }
     if (shop.handleEvent(event))
     {
-      deserialize("map4.dat");
-      deserializeSprites("sprites4.dat");
       level = -1;
     }
   }
